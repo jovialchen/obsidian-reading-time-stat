@@ -1,6 +1,6 @@
 {
   "name": "obsidian-reading-time-stat",
-  "version": "1.0.0",
+  "version": "0.0.1",
   "description": "Track reading time and calculate hot notes based on reading time, frequency, and recency",
   "main": "main.js",
   "scripts": {
