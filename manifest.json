@@ -3,7 +3,7 @@
   "name": "Reading Time Statistics",
   "version": "0.0.1",
   "minAppVersion": "1.0.0",
-  "description": "Track reading time and discover your hottest notes based on reading time, frequency, and recency.",
+  "description": "Track reading time and discover your most valuable notes based on reading habits, frequency, and recency.",
   "author": "jovialchen",
   "authorUrl": "https://github.com/jovialchen",
   "isDesktopOnly": false
