@@ -1,0 +1,553 @@
+/* Reading Time Statistics Plugin - Modern Design */
+
+/* ===== Main Container ===== */
+.reading-time-stat-container {
+    padding: 16px;
+    font-family: var(--font-interface);
+}
+
+/* ===== Summary Section ===== */
+.stats-summary {
+    margin-bottom: 20px;
+    padding: 16px;
+    border-radius: 8px;
+    background: linear-gradient(135deg, var(--background-secondary) 0%, var(--background-secondary-alt) 100%);
+    border: 1px solid var(--background-modifier-border);
+}
+
+.stats-summary h3 {
+    margin-bottom: 12px;
+    font-size: 1.2em;
+    color: var(--text-normal);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.stats-summary p {
+    margin: 8px 0;
+    color: var(--text-muted);
+    font-size: 0.95em;
+}
+
+.stats-summary p:first-of-type {
+    color: var(--text-accent);
+    font-weight: 500;
+}
+
+/* ===== Time Range Filter ===== */
+.time-range-filter {
+    margin-bottom: 16px;
+    padding: 10px 14px;
+    border-radius: 6px;
+    background: var(--background-primary-alt);
+    border: 1px solid var(--background-modifier-border);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.filter-label {
+    color: var(--text-muted);
+    font-size: 0.9em;
+    font-weight: 500;
+}
+
+.time-range-select {
+    padding: 6px 12px;
+    border-radius: 6px;
+    border: 1px solid var(--background-modifier-border);
+    background: var(--background-primary);
+    color: var(--text-normal);
+    font-size: 0.9em;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    min-width: 140px;
+}
+
+.time-range-select:hover {
+    border-color: var(--text-accent);
+    background: var(--background-secondary);
+}
+
+.time-range-select:focus {
+    outline: none;
+    border-color: var(--interactive-accent);
+    box-shadow: 0 0 0 2px var(--interactive-accent-hover);
+}
+
+/* ===== Popular Notes Section ===== */
+.popular-notes {
+    margin-bottom: 20px;
+}
+
+.popular-notes h3 {
+    display: inline-block;
+    margin-bottom: 14px;
+    margin-right: 8px;
+    font-size: 1.1em;
+    color: var(--text-normal);
+}
+
+.time-range-badge {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 12px;
+    background: var(--interactive-accent);
+    color: var(--text-on-accent);
+    font-size: 0.75em;
+    font-weight: 600;
+    vertical-align: middle;
+    margin-bottom: 10px;
+}
+
+.no-stats {
+    color: var(--text-muted);
+    text-align: center;
+    padding: 24px 16px;
+    border-radius: 8px;
+    background: var(--background-secondary);
+    font-size: 0.95em;
+}
+
+/* ===== Popular Notes List ===== */
+.popular-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    border-radius: 8px;
+    background: var(--background-secondary);
+    border: 1px solid var(--background-modifier-border);
+}
+
+.popular-item {
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--background-modifier-border);
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px;
+    transition: background 0.15s ease;
+}
+
+.popular-item:last-child {
+    border-bottom: none;
+}
+
+.popular-item:hover {
+    background: var(--background-primary-alt);
+}
+
+.popular-item:first-child {
+    background: linear-gradient(90deg, rgba(46, 204, 113, 0.08) 0%, transparent 100%);
+}
+
+.popular-item:first-child:hover {
+    background: linear-gradient(90deg, rgba(46, 204, 113, 0.12) 0%, var(--background-primary-alt) 100%);
+}
+
+/* Rank Badge */
+.rank-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 28px;
+    height: 22px;
+    padding: 0 6px;
+    border-radius: 4px;
+    background: var(--background-primary-alt);
+    color: var(--text-muted);
+    font-size: 0.75em;
+    font-weight: 600;
+    flex-shrink: 0;
+}
+
+.rank-badge.rank-first {
+    background: linear-gradient(135deg, #f1c40f 0%, #f39c12 100%);
+    color: #fff;
+}
+
+.note-name {
+    color: var(--text-accent);
+    cursor: pointer;
+    text-decoration: none;
+    font-weight: 500;
+    font-size: 0.95em;
+    transition: color 0.15s ease;
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.note-name:hover {
+    color: var(--interactive-accent);
+    text-decoration: underline;
+}
+
+/* Stats Row */
+.stats-row {
+    display: flex;
+    gap: 6px;
+    flex-shrink: 0;
+    width: 100%;
+    margin-top: 4px;
+    padding-left: 38px;
+}
+
+.stat-item {
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 0.8em;
+    font-weight: 500;
+}
+
+.stat-time {
+    background: rgba(52, 152, 219, 0.15);
+    color: var(--text-accent);
+}
+
+.stat-count {
+    background: rgba(155, 89, 182, 0.15);
+    color: var(--text-muted);
+}
+
+.stat-date {
+    background: var(--background-primary-alt);
+    color: var(--text-faint);
+}
+
+/* ===== Current Tracking Section ===== */
+.current-note-stats {
+    padding: 16px;
+    border-radius: 8px;
+    background: var(--background-secondary);
+    border: 1px solid var(--background-modifier-border);
+    margin-top: 20px;
+    position: relative;
+    overflow: hidden;
+}
+
+.current-note-stats::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, var(--interactive-accent), var(--text-accent));
+}
+
+.current-note-stats h3 {
+    margin-bottom: 14px;
+    font-size: 1.1em;
+    color: var(--text-normal);
+}
+
+.current-file-name {
+    color: var(--text-normal);
+    font-weight: 600;
+    font-size: 1.05em;
+    margin-bottom: 14px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--background-modifier-border);
+}
+
+/* Stats Grid */
+.tracking-stats-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    margin-bottom: 12px;
+}
+
+.stat-box {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 10px 8px;
+    background: var(--background-primary-alt);
+    border-radius: 8px;
+    text-align: center;
+}
+
+.stat-label {
+    font-size: 0.75em;
+    color: var(--text-faint);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 4px;
+}
+
+.stat-value {
+    font-size: 1.1em;
+    font-weight: 600;
+    color: var(--text-normal);
+}
+
+.stat-value.live {
+    color: var(--text-success);
+    position: relative;
+}
+
+.stat-value.live::after {
+    content: '';
+    display: inline-block;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--text-success);
+    margin-left: 6px;
+    animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+    0%, 100% {
+        opacity: 1;
+        transform: scale(1);
+    }
+    50% {
+        opacity: 0.5;
+        transform: scale(1.3);
+    }
+}
+
+.first-read-date {
+    font-size: 0.85em;
+    color: var(--text-muted);
+    margin-top: 8px;
+    text-align: center;
+}
+
+.first-time {
+    color: var(--text-success);
+    text-align: center;
+    font-style: italic;
+    font-size: 0.9em;
+    margin-top: 10px;
+    padding: 6px;
+    background: rgba(46, 204, 113, 0.1);
+    border-radius: 6px;
+}
+
+.no-tracking {
+    color: var(--text-faint);
+    text-align: center;
+    padding: 12px;
+    background: var(--background-primary-alt);
+    border-radius: 6px;
+    font-size: 0.9em;
+}
+
+/* ===== Popular Notes Modal ===== */
+.popular-notes-modal {
+    padding: 24px;
+    max-width: 650px;
+}
+
+.popular-notes-modal h2 {
+    margin-bottom: 16px;
+    font-size: 1.3em;
+    color: var(--text-normal);
+}
+
+.modal-filter {
+    margin-bottom: 18px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 14px;
+    background: var(--background-secondary);
+    border-radius: 8px;
+}
+
+.table-container {
+    margin-top: 12px;
+    overflow-x: auto;
+}
+
+.popular-table {
+    width: 100%;
+    border-collapse: collapse;
+    border-radius: 8px;
+    background: var(--background-secondary);
+    border: 1px solid var(--background-modifier-border);
+    overflow: hidden;
+}
+
+.popular-table th,
+.popular-table td {
+    padding: 10px 12px;
+    text-align: left;
+}
+
+.popular-table thead {
+    background: var(--background-secondary-alt);
+}
+
+.popular-table th {
+    font-weight: 600;
+    color: var(--text-normal);
+    font-size: 0.85em;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    border-bottom: 2px solid var(--background-modifier-border);
+}
+
+.popular-table tbody tr {
+    transition: background 0.15s ease;
+    border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.popular-table tbody tr:last-child {
+    border-bottom: none;
+}
+
+.popular-table tbody tr:hover {
+    background: var(--background-primary-alt);
+}
+
+.popular-table tbody tr.top-note {
+    background: linear-gradient(90deg, rgba(241, 196, 15, 0.08) 0%, transparent 100%);
+}
+
+.popular-table tbody tr.top-note:hover {
+    background: linear-gradient(90deg, rgba(241, 196, 15, 0.12) 0%, var(--background-primary-alt) 100%);
+}
+
+/* Modal Rank Badge */
+.modal-rank-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 32px;
+    height: 24px;
+    padding: 0 8px;
+    border-radius: 4px;
+    background: var(--background-primary-alt);
+    color: var(--text-muted);
+    font-size: 0.8em;
+    font-weight: 600;
+}
+
+.modal-rank-badge.rank-1 {
+    background: linear-gradient(135deg, #f1c40f 0%, #f39c12 100%);
+    color: #fff;
+}
+
+.modal-rank-badge.rank-2 {
+    background: linear-gradient(135deg, #bdc3c7 0%, #95a5a6 100%);
+    color: #fff;
+}
+
+.modal-rank-badge.rank-3 {
+    background: linear-gradient(135deg, #d35400 0%, #e67e22 100%);
+    color: #fff;
+}
+
+.popular-table td {
+    color: var(--text-muted);
+    font-size: 0.9em;
+}
+
+.popular-table td:nth-child(2) a {
+    color: var(--text-accent);
+    font-weight: 500;
+    text-decoration: none;
+    transition: color 0.15s ease;
+}
+
+.popular-table td:nth-child(2) a:hover {
+    color: var(--interactive-accent);
+    text-decoration: underline;
+}
+
+.modal-stat {
+    padding: 3px 8px;
+    border-radius: 4px;
+    background: var(--background-primary-alt);
+    font-size: 0.85em;
+}
+
+.modal-score {
+    font-weight: 600;
+    color: var(--text-success);
+    padding: 3px 8px;
+    border-radius: 4px;
+    background: rgba(46, 204, 113, 0.1);
+}
+
+/* ===== Modal Buttons ===== */
+.modal-buttons {
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+    margin-top: 24px;
+}
+
+.modal-buttons button {
+    padding: 10px 20px;
+    border-radius: 6px;
+    font-size: 0.95em;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border: 1px solid var(--background-modifier-border);
+}
+
+.modal-buttons button:hover {
+    transform: translateY(-1px);
+}
+
+.modal-buttons button.mod-warning {
+    background: var(--background-modifier-error);
+    color: var(--text-on-accent);
+    border-color: var(--background-modifier-error);
+}
+
+.modal-buttons button.mod-warning:hover {
+    opacity: 0.9;
+}
+
+/* ===== Settings Tab ===== */
+.settings-section-header {
+    margin-top: 24px;
+    margin-bottom: 8px;
+    border-bottom: 2px solid var(--interactive-accent);
+    padding-bottom: 8px;
+    font-size: 1.1em;
+}
+
+.settings-section-desc {
+    color: var(--text-muted);
+    font-size: 0.85em;
+    margin-bottom: 16px;
+    padding: 8px 12px;
+    background: var(--background-secondary);
+    border-radius: 6px;
+}
+
+/* ===== Responsive Adjustments ===== */
+@media (max-width: 400px) {
+    .reading-time-stat-container {
+        padding: 12px;
+    }
+
+    .popular-item {
+        flex-direction: column;
+        gap: 6px;
+        align-items: flex-start;
+    }
+
+    .note-stats {
+        width: 100%;
+    }
+
+    .popular-table th,
+    .popular-table td {
+        padding: 8px 10px;
+    }
+}
