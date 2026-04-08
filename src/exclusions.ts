@@ -1,4 +1,4 @@
-import type { ReadingTimeStatSettings } from './types';
+import type { ReadingTimeStatSettings, NoteStats } from './types';
 
 /**
  * Check if a file path matches a wildcard pattern
@@ -50,10 +50,10 @@ export function shouldExclude(filePath: string, settings: ReadingTimeStatSetting
  * Filter notes that should be excluded
  */
 export function filterExcludedNotes(
-    notes: Record<string, any>,
+    notes: Record<string, NoteStats>,
     settings: ReadingTimeStatSettings
-): Record<string, any> {
-    const filtered: Record<string, any> = {};
+): Record<string, NoteStats> {
+    const filtered: Record<string, NoteStats> = {};
 
     for (const [path, stats] of Object.entries(notes)) {
         if (!shouldExclude(path, settings)) {

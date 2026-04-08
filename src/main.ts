@@ -11,7 +11,7 @@ import {
 import type { ReadingTimeStatSettings, StatsData, PopularNote, TimeRange } from './types';
 import { DEFAULT_SETTINGS, TIME_RANGE_OPTIONS } from './types';
 import { StatsManager } from './stats';
-import { ReadingTimeTracker, TrackingStatus } from './tracker';
+import { ReadingTimeTracker } from './tracker';
 import { getPopularNotes, formatReadingTime, formatLastVisited } from './popularity';
 
 const VIEW_TYPE = 'reading-time-stat-view';
@@ -23,7 +23,6 @@ export default class ReadingTimeStatPlugin extends Plugin {
     private settings: ReadingTimeStatSettings;
     private statsManager: StatsManager;
     private tracker: ReadingTimeTracker;
-    private view: ReadingTimeStatView | null = null;
 
     async onload() {
         // Load all plugin data (settings + stats)
@@ -43,45 +42,43 @@ export default class ReadingTimeStatPlugin extends Plugin {
             this.settings,
             this.saveStats.bind(this),
             () => {
-                if (this.view) {
-                    this.view.update();
+                const view = this.getView();
+                if (view) {
+                    view.update();
                 }
             }
         );
 
         // Register view
-        this.registerView(VIEW_TYPE, (leaf) => {
-            this.view = new ReadingTimeStatView(leaf, this);
-            return this.view;
-        });
+        this.registerView(VIEW_TYPE, (leaf) => new ReadingTimeStatView(leaf, this));
 
         // Add ribbon icon
-        this.addRibbonIcon('clock', 'Reading Time Stats', () => {
+        this.addRibbonIcon('clock', 'Reading time stats', () => {
             this.activateView();
         });
 
         // Add commands
         this.addCommand({
             id: 'open-stats-view',
-            name: 'Open Statistics View',
+            name: 'Open statistics view',
             callback: () => this.activateView(),
         });
 
         this.addCommand({
             id: 'show-popular-notes',
-            name: 'Show Popular Notes',
+            name: 'Show popular notes',
             callback: () => this.showPopularNotesModal(),
         });
 
         this.addCommand({
             id: 'export-stats',
-            name: 'Export Statistics',
+            name: 'Export statistics',
             callback: () => this.exportStats(),
         });
 
         this.addCommand({
             id: 'clear-stats',
-            name: 'Clear All Statistics',
+            name: 'Clear all statistics',
             callback: () => this.confirmClearStats(),
         });
 
@@ -95,13 +92,9 @@ export default class ReadingTimeStatPlugin extends Plugin {
         this.register(() => this.tracker.stop());
     }
 
-    async onunload() {
+    onunload(): void {
         this.tracker.stop();
-        await this.saveStats();
-
-        if (this.view) {
-            this.view.destroy();
-        }
+        void this.saveStats();
     }
 
     /**
@@ -184,13 +177,14 @@ export default class ReadingTimeStatPlugin extends Plugin {
     private confirmClearStats(): void {
         new ConfirmModal(
             this.app,
-            'Clear All Statistics',
+            'Clear all statistics',
             'This will permanently delete all reading time statistics. Are you sure?',
             async () => {
                 this.statsManager.clearAll();
                 await this.saveStats();
-                if (this.view) {
-                    this.view.update();
+                const view = this.getView();
+                if (view) {
+                    view.update();
                 }
                 new Notice('All statistics cleared');
             }
@@ -217,6 +211,17 @@ export default class ReadingTimeStatPlugin extends Plugin {
     getTracker(): ReadingTimeTracker {
         return this.tracker;
     }
+
+    /**
+     * Get the view instance if it exists
+     */
+    getView(): ReadingTimeStatView | null {
+        const leaves = this.app.workspace.getLeavesOfType(VIEW_TYPE);
+        if (leaves.length > 0 && leaves[0].view instanceof ReadingTimeStatView) {
+            return leaves[0].view;
+        }
+        return null;
+    }
 }
 
 /**
@@ -236,19 +241,21 @@ class ReadingTimeStatView extends ItemView {
     }
 
     getDisplayText(): string {
-        return 'Reading Time Stats';
+        return 'Reading time stats';
     }
 
     getIcon(): string {
         return 'clock';
     }
 
-    async onOpen(): Promise<void> {
+    onOpen(): Promise<void> {
         this.update();
+        return Promise.resolve();
     }
 
-    async onClose(): Promise<void> {
+    onClose(): Promise<void> {
         // Cleanup
+        return Promise.resolve();
     }
 
     destroy(): void {
@@ -279,7 +286,7 @@ class ReadingTimeStatView extends ItemView {
 
         // Time range selector
         const filterDiv = container.createDiv({ cls: 'time-range-filter' });
-        filterDiv.createEl('span', { text: 'Time Range: ', cls: 'filter-label' });
+        filterDiv.createEl('span', { text: 'Time range: ', cls: 'filter-label' });
 
         const select = filterDiv.createEl('select', { cls: 'time-range-select' });
         for (const option of TIME_RANGE_OPTIONS) {
@@ -302,13 +309,13 @@ class ReadingTimeStatView extends ItemView {
         const popularNotes = getPopularNotes(
             this.plugin.getStatsManager().getAllNotes(),
             this.plugin.getSettings(),
-            10,
+            this.plugin.getSettings().popularNotesLimit,
             this.currentTimeRange
         );
 
         const popularDiv = container.createDiv({ cls: 'popular-notes' });
         const rangeLabel = TIME_RANGE_OPTIONS.find(o => o.value === this.currentTimeRange)?.label || 'All Time';
-        popularDiv.createEl('h3', { text: `Popular Notes` });
+        popularDiv.createEl('h3', { text: 'Popular notes' });
         popularDiv.createEl('span', {
             text: rangeLabel,
             cls: 'time-range-badge',
@@ -358,7 +365,7 @@ class ReadingTimeStatView extends ItemView {
         // Current tracking status (real-time)
         const trackingStatus = this.plugin.getTracker().getStatus();
         const trackingDiv = container.createDiv({ cls: 'current-note-stats' });
-        trackingDiv.createEl('h3', { text: 'Currently Tracking' });
+        trackingDiv.createEl('h3', { text: 'Currently tracking' });
 
         if (trackingStatus.filePath) {
             const fileName = trackingStatus.filePath.split('/').pop()?.replace(/\.md$/, '') || trackingStatus.filePath;
@@ -441,11 +448,11 @@ class PopularNotesModal extends Modal {
         const { contentEl } = this;
         contentEl.addClass('popular-notes-modal');
 
-        contentEl.createEl('h2', { text: 'Popular Notes Ranking' });
+        contentEl.createEl('h2', { text: 'Popular notes ranking' });
 
         // Time range selector
         const filterDiv = contentEl.createDiv({ cls: 'modal-filter' });
-        filterDiv.createEl('span', { text: 'Time Range: ', cls: 'filter-label' });
+        filterDiv.createEl('span', { text: 'Time range: ', cls: 'filter-label' });
 
         const select = filterDiv.createEl('select', { cls: 'time-range-select' });
         for (const option of TIME_RANGE_OPTIONS) {
@@ -503,7 +510,7 @@ class PopularNotesModal extends Modal {
         header.createEl('th', { text: 'Note' });
         header.createEl('th', { text: 'Time' });
         header.createEl('th', { text: 'Sessions' });
-        header.createEl('th', { text: 'Last Visited' });
+        header.createEl('th', { text: 'Last visited' });
         header.createEl('th', { text: 'Score' });
 
         const tbody = table.createEl('tbody');
@@ -578,8 +585,8 @@ class ConfirmModal extends Modal {
 
         buttons
             .createEl('button', { text: 'Confirm', cls: 'mod-warning' })
-            .addEventListener('click', async () => {
-                await this.onConfirm();
+            .addEventListener('click', () => {
+                void this.onConfirm();
                 this.close();
             });
     }
@@ -605,82 +612,83 @@ class ReadingTimeStatSettingTab extends PluginSettingTab {
         const { containerEl } = this;
         containerEl.empty();
 
-        containerEl.createEl('h2', { text: 'Reading Time Statistics Settings' });
+        new Setting(containerEl).setName('Reading time statistics settings').setHeading();
 
         new Setting(containerEl)
-            .setName('Reading Time Weight')
+            .setName('Reading time weight')
             .setDesc('Weight for reading time in popularity calculation (per minute)')
             .addSlider((slider) =>
                 slider
                     .setLimits(0.1, 5, 0.1)
                     .setValue(this.plugin.getSettings().readingTimeWeight)
                     .setDynamicTooltip()
-                    .onChange(async (value) => {
+                    .onChange((value) => {
                         this.plugin.getSettings().readingTimeWeight = value;
-                        await this.plugin.saveSettings();
+                        void this.plugin.saveSettings();
                     })
             );
 
         new Setting(containerEl)
-            .setName('Reading Count Weight')
+            .setName('Reading count weight')
             .setDesc('Weight for reading count in popularity calculation')
             .addSlider((slider) =>
                 slider
                     .setLimits(1, 20, 1)
                     .setValue(this.plugin.getSettings().readingCountWeight)
                     .setDynamicTooltip()
-                    .onChange(async (value) => {
+                    .onChange((value) => {
                         this.plugin.getSettings().readingCountWeight = value;
-                        await this.plugin.saveSettings();
+                        void this.plugin.saveSettings();
                     })
             );
 
         new Setting(containerEl)
-            .setName('Recency Decay Factor')
+            .setName('Recency decay factor')
             .setDesc('How much popularity decays per day since last read')
             .addSlider((slider) =>
                 slider
                     .setLimits(0, 0.5, 0.01)
                     .setValue(this.plugin.getSettings().recencyDecayFactor)
                     .setDynamicTooltip()
-                    .onChange(async (value) => {
+                    .onChange((value) => {
                         this.plugin.getSettings().recencyDecayFactor = value;
-                        await this.plugin.saveSettings();
+                        void this.plugin.saveSettings();
                     })
             );
 
         new Setting(containerEl)
-            .setName('Popular Notes Limit')
+            .setName('Popular notes limit')
             .setDesc('Maximum number of popular notes to display')
             .addText((text) =>
                 text
                     .setValue(String(this.plugin.getSettings().popularNotesLimit))
-                    .onChange(async (value) => {
+                    .onChange((value) => {
                         const num = parseInt(value);
                         if (num > 0) {
                             this.plugin.getSettings().popularNotesLimit = num;
-                            await this.plugin.saveSettings();
+                            void this.plugin.saveSettings();
+                            this.plugin.getView()?.update();
                         }
                     })
             );
 
         new Setting(containerEl)
-            .setName('Minimum Session Time')
+            .setName('Minimum session time')
             .setDesc('Minimum seconds to count as a reading session')
             .addText((text) =>
                 text
                     .setValue(String(this.plugin.getSettings().minSessionTime))
-                    .onChange(async (value) => {
+                    .onChange((value) => {
                         const num = parseInt(value);
                         if (num >= 0) {
                             this.plugin.getSettings().minSessionTime = num;
-                            await this.plugin.saveSettings();
+                            void this.plugin.saveSettings();
                         }
                     })
             );
 
         // Exclusions section
-        containerEl.createEl('h3', { text: 'Exclusions', cls: 'settings-section-header' });
+        new Setting(containerEl).setName('Exclusions').setHeading();
         containerEl.createEl('p', {
             text: 'Exclude certain folders or files from tracking (e.g., Kanban boards, Templates, Todo lists)',
             cls: 'settings-section-desc',
@@ -688,35 +696,35 @@ class ReadingTimeStatSettingTab extends PluginSettingTab {
 
         // Excluded folders
         new Setting(containerEl)
-            .setName('Excluded Folders')
+            .setName('Excluded folders')
             .setDesc('Folder paths to exclude. One per line. Example: Kanban/, Templates/')
             .addTextArea((text) =>
                 text
                     .setPlaceholder('Kanban/\nTemplates/\nArchive/')
                     .setValue(this.plugin.getSettings().excludedFolders.join('\n'))
-                    .onChange(async (value) => {
+                    .onChange((value) => {
                         this.plugin.getSettings().excludedFolders = value
                             .split('\n')
                             .map((s) => s.trim())
                             .filter((s) => s.length > 0);
-                        await this.plugin.saveSettings();
+                        void this.plugin.saveSettings();
                     })
             );
 
         // Excluded patterns
         new Setting(containerEl)
-            .setName('Excluded File Patterns')
+            .setName('Excluded file patterns')
             .setDesc('File name patterns to exclude. Supports * wildcard. One per line. Example: todo-*, *-kanban')
             .addTextArea((text) =>
                 text
                     .setPlaceholder('todo-*\n*-kanban\nDaily Note*')
                     .setValue(this.plugin.getSettings().excludedPatterns.join('\n'))
-                    .onChange(async (value) => {
+                    .onChange((value) => {
                         this.plugin.getSettings().excludedPatterns = value
                             .split('\n')
                             .map((s) => s.trim())
                             .filter((s) => s.length > 0);
-                        await this.plugin.saveSettings();
+                        void this.plugin.saveSettings();
                     })
             );
     }

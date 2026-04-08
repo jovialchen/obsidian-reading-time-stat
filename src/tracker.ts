@@ -1,4 +1,4 @@
-import { App, debounce, TFile, EventRef } from 'obsidian';
+import { App, TFile, EventRef } from 'obsidian';
 import type { ReadingTimeStatSettings } from './types';
 import { StatsManager } from './stats';
 import { shouldExclude } from './exclusions';
@@ -209,7 +209,7 @@ export class ReadingTimeTracker {
         // Save every 30 seconds
         this.trackingIntervalId = window.setInterval(() => {
             this.saveCurrentSession();
-            this.saveDataCallback();
+            void this.saveDataCallback();
         }, 30000);
     }
 
