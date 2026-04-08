@@ -5,11 +5,11 @@
 <a href="https://github.com/obsidianmd/obsidian-releases/blob/master/community-plugins.json">
   <img src="https://img.shields.io/badge/Obsidian-Community%20Plugin-7C3AED?style=flat-square&logo=obsidian" alt="Obsidian Community Plugin">
 </a>
-<a href="https://github.com/your-username/obsidian-reading-time-stat/releases">
-  <img src="https://img.shields.io/github/v/release/your-username/obsidian-reading-time-stat?style=flat-square" alt="Release">
+<a href="https://github.com/jovialchen/obsidian-reading-time-stat/releases">
+  <img src="https://img.shields.io/github/v/release/jovialchen/obsidian-reading-time-stat?style=flat-square" alt="Release">
 </a>
-<a href="https://github.com/your-username/obsidian-reading-time-stat/blob/main/LICENSE">
-  <img src="https://img.shields.io/github/license/your-username/obsidian-reading-time-stat?style=flat-square" alt="License">
+<a href="https://github.com/jovialchen/obsidian-reading-time-stat/blob/main/LICENSE">
+  <img src="https://img.shields.io/github/license/jovialchen/obsidian-reading-time-stat?style=flat-square" alt="License">
 </a>
 
 > 特别感谢我的朋友 **LC** 分享这个创意，感谢 **CosmoBite Labs** 进行测试和反馈。
@@ -47,14 +47,14 @@
 4. 点击 **安装**，然后 **启用**
 
 ### 手动安装
-1. 从 [最新发布](https://github.com/your-username/obsidian-reading-time-stat/releases) 下载 `main.js`、`styles.css` 和 `manifest.json`
+1. 从 [最新发布](https://github.com/jovialchen/obsidian-reading-time-stat/releases) 下载 `main.js`、`styles.css` 和 `manifest.json`
 2. 在你的库的 `.obsidian/plugins/` 目录下创建 `reading-time-stat` 文件夹
 3. 将下载的文件复制到该文件夹
 4. 在 Obsidian 设置 → 社区插件中启用此插件
 
 ### 从源码构建
 ```bash
-git clone https://github.com/your-username/obsidian-reading-time-stat.git
+git clone https://github.com/jovialchen/obsidian-reading-time-stat.git
 cd obsidian-reading-time-stat
 npm install
 npm run build

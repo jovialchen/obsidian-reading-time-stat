@@ -5,11 +5,11 @@ English | [简体中文](README_CN.md)
 <a href="https://github.com/obsidianmd/obsidian-releases/blob/master/community-plugins.json">
   <img src="https://img.shields.io/badge/Obsidian-Community%20Plugin-7C3AED?style=flat-square&logo=obsidian" alt="Obsidian Community Plugin">
 </a>
-<a href="https://github.com/your-username/obsidian-reading-time-stat/releases">
-  <img src="https://img.shields.io/github/v/release/your-username/obsidian-reading-time-stat?style=flat-square" alt="Release">
+<a href="https://github.com/jovialchen/obsidian-reading-time-stat/releases">
+  <img src="https://img.shields.io/github/v/release/jovialchen/obsidian-reading-time-stat?style=flat-square" alt="Release">
 </a>
-<a href="https://github.com/your-username/obsidian-reading-time-stat/blob/main/LICENSE">
-  <img src="https://img.shields.io/github/license/your-username/obsidian-reading-time-stat?style=flat-square" alt="License">
+<a href="https://github.com/jovialchen/obsidian-reading-time-stat/blob/main/LICENSE">
+  <img src="https://img.shields.io/github/license/jovialchen/obsidian-reading-time-stat?style=flat-square" alt="License">
 </a>
 
 > Special thanks to my friend **LC** for sharing this brilliant idea, and **CosmoBite Labs** for testing and feedback.
@@ -47,14 +47,14 @@ Track your reading habits and discover your most valuable notes in Obsidian. Thi
 4. Click **Install**, then **Enable**
 
 ### Manual Installation
-1. Download `main.js`, `styles.css`, and `manifest.json` from the [latest release](https://github.com/your-username/obsidian-reading-time-stat/releases)
+1. Download `main.js`, `styles.css`, and `manifest.json` from the [latest release](https://github.com/jovialchen/obsidian-reading-time-stat/releases)
 2. Create a folder `reading-time-stat` in your vault's `.obsidian/plugins/` directory
 3. Copy the downloaded files into that folder
 4. Enable the plugin in Obsidian Settings → Community plugins
 
 ### From Source
 ```bash
-git clone https://github.com/your-username/obsidian-reading-time-stat.git
+git clone https://github.com/jovialchen/obsidian-reading-time-stat.git
 cd obsidian-reading-time-stat
 npm install
 npm run build
