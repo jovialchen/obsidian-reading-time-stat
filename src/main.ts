@@ -54,7 +54,7 @@ export default class ReadingTimeStatPlugin extends Plugin {
 
         // Add ribbon icon
         this.addRibbonIcon('clock', 'Reading time stats', () => {
-            this.activateView();
+            void this.activateView();
         });
 
         // Add commands
@@ -135,7 +135,7 @@ export default class ReadingTimeStatPlugin extends Plugin {
         }
 
         if (leaf) {
-            workspace.revealLeaf(leaf);
+            void workspace.revealLeaf(leaf);
         }
     }
 
@@ -342,7 +342,7 @@ class ReadingTimeStatView extends ItemView {
                     text: note.name,
                     cls: 'note-name',
                 }).addEventListener('click', () => {
-                    this.app.workspace.openLinkText(note.path, '', true);
+                    void this.app.workspace.openLinkText(note.path, '', true);
                 });
 
                 // Stats row
@@ -413,7 +413,7 @@ class ReadingTimeStatView extends ItemView {
             }
         } else {
             trackingDiv.createEl('p', {
-                text: 'No markdown file active or file is excluded',
+                text: 'No markdown file active or excluded',
                 cls: 'no-tracking',
             });
         }
@@ -529,7 +529,7 @@ class PopularNotesModal extends Modal {
             // Note name
             const noteCell = row.createEl('td');
             noteCell.createEl('a', { text: note.name }).addEventListener('click', () => {
-                this.app.workspace.openLinkText(note.path, '', true);
+                void this.app.workspace.openLinkText(note.path, '', true);
                 this.close();
             });
 
@@ -612,7 +612,7 @@ class ReadingTimeStatSettingTab extends PluginSettingTab {
         const { containerEl } = this;
         containerEl.empty();
 
-        new Setting(containerEl).setName('Reading time statistics settings').setHeading();
+        new Setting(containerEl).setName('Configuration').setHeading();
 
         new Setting(containerEl)
             .setName('Reading time weight')
@@ -697,7 +697,7 @@ class ReadingTimeStatSettingTab extends PluginSettingTab {
         // Excluded folders
         new Setting(containerEl)
             .setName('Excluded folders')
-            .setDesc('Folder paths to exclude. One per line. Example: Kanban/, Templates/')
+            .setDesc('Folder paths to exclude, one per line. Example: Kanban/, Templates/')
             .addTextArea((text) =>
                 text
                     .setPlaceholder('Kanban/\nTemplates/\nArchive/')
@@ -714,10 +714,10 @@ class ReadingTimeStatSettingTab extends PluginSettingTab {
         // Excluded patterns
         new Setting(containerEl)
             .setName('Excluded file patterns')
-            .setDesc('File name patterns to exclude. Supports * wildcard. One per line. Example: todo-*, *-kanban')
+            .setDesc('File name patterns to exclude, supports * wildcard. One per line. Example: todo-*, *-kanban')
             .addTextArea((text) =>
                 text
-                    .setPlaceholder('todo-*\n*-kanban\nDaily Note*')
+                    .setPlaceholder('todo-*\n*-kanban\nDaily note*')
                     .setValue(this.plugin.getSettings().excludedPatterns.join('\n'))
                     .onChange((value) => {
                         this.plugin.getSettings().excludedPatterns = value
