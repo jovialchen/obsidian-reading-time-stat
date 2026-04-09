@@ -53,7 +53,7 @@ export default class ReadingTimeStatPlugin extends Plugin {
         this.registerView(VIEW_TYPE, (leaf) => new ReadingTimeStatView(leaf, this));
 
         // Add ribbon icon
-        this.addRibbonIcon('clock', 'Reading time stats', () => {
+        this.addRibbonIcon('rose', 'Reading time stats', () => {
             void this.activateView();
         });
 
@@ -245,7 +245,7 @@ class ReadingTimeStatView extends ItemView {
     }
 
     getIcon(): string {
-        return 'clock';
+        return 'rose';
     }
 
     onOpen(): Promise<void> {
