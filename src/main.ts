@@ -690,17 +690,17 @@ class ReadingTimeStatSettingTab extends PluginSettingTab {
         // Exclusions section
         new Setting(containerEl).setName('Exclusions').setHeading();
         containerEl.createEl('p', {
-            text: 'Exclude certain folders or files from tracking (e.g., Kanban boards, Templates, Todo lists)',
+            text: 'Exclude certain folders or files from tracking (e.g., kanban boards, templates, todo lists)',
             cls: 'settings-section-desc',
         });
 
         // Excluded folders
         new Setting(containerEl)
             .setName('Excluded folders')
-            .setDesc('Folder paths to exclude, one per line. Example: Kanban/, Templates/')
+            .setDesc('Folder paths to exclude, one per line. Example: kanban/, templates/')
             .addTextArea((text) =>
                 text
-                    .setPlaceholder('Kanban/\nTemplates/\nArchive/')
+                    .setPlaceholder('kanban/\ntemplates/\narchive/')
                     .setValue(this.plugin.getSettings().excludedFolders.join('\n'))
                     .onChange((value) => {
                         this.plugin.getSettings().excludedFolders = value
@@ -717,7 +717,7 @@ class ReadingTimeStatSettingTab extends PluginSettingTab {
             .setDesc('File name patterns to exclude, supports * wildcard. One per line. Example: todo-*, *-kanban')
             .addTextArea((text) =>
                 text
-                    .setPlaceholder('todo-*\n*-kanban\nDaily note*')
+                    .setPlaceholder('todo-*\n*-kanban\ndaily note*')
                     .setValue(this.plugin.getSettings().excludedPatterns.join('\n'))
                     .onChange((value) => {
                         this.plugin.getSettings().excludedPatterns = value
