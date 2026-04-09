@@ -62,7 +62,41 @@ this.register(this.app.vault.on('rename', (file, oldPath) => {
 - [ ] **Add "no notes tracked" state** when stats are empty (first-time user guidance)
 - [ ] **Add visual indicator for excluded files** (e.g., show "Excluded" badge when viewing excluded file)
 - [ ] **Add graph/chart view** for reading trends over time (optional)
-- [ ] **Dark mode specific color tweaks** (verify all CSS variables work in both themes)
+
+### Theme Compatibility
+> **Current status**: Most styles use CSS variables (`var(--text-normal)`, etc.) but rank badges use hardcoded colors.
+
+**Hardcoded colors in styles.css:**
+- Rank badge #1 (gold): `#f1c40f`, `#f39c12` (lines 179, 451)
+- Rank badge #2 (silver): `#bdc3c7`, `#95a5a6` (line 456)
+- Rank badge #3 (bronze): `#d35400`, `#e67e22` (line 461)
+
+**Solutions:**
+```css
+/* Option A: Use theme accent colors */
+.rank-badge.rank-first {
+    background: var(--interactive-accent);
+    color: var(--text-on-accent);
+}
+
+/* Option B: Use CSS color-mix() for subtle variations */
+.rank-badge.rank-first {
+    background: color-mix(in srgb, var(--text-success) 70%, var(--background-secondary));
+}
+
+/* Option C: Define custom CSS variables in plugin */
+:root {
+    --rts-rank-gold: #f1c40f;
+    --rts-rank-silver: #bdc3c7;
+    --rts-rank-bronze: #d35400;
+}
+/* Users can override in their theme/snippets */
+```
+
+- [ ] **Replace hardcoded rank badge colors** with CSS variables or theme-aware alternatives
+- [ ] **Test on popular themes** (Minimal, Dracula, Things, etc.)
+- [ ] **Add theme-specific CSS snippet examples** in README
+- [ ] **Verify accent colors work in both light and dark mode**
 
 ### Interaction Improvements
 - [ ] **Double-click to open note** in popular list (currently only single click works in modal)
@@ -165,6 +199,7 @@ this.register(this.app.vault.on('rename', (file, oldPath) => {
 |-------|----------|--------|
 | Deleted/renamed files leave orphan stats | High | Planned for v1.0.1 |
 | Clicking deleted file in popular list fails | Medium | Planned for v1.0.1 |
+| Rank badges use hardcoded colors | Low | Planned for v1.1.0 |
 | No visual feedback when viewing excluded file | Low | Planned for v1.1.0 |
 | Main.ts file too large (800+ lines) | Low | Planned for refactor |
 
