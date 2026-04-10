@@ -413,7 +413,7 @@ class ReadingTimeStatView extends ItemView {
             }
         } else {
             trackingDiv.createEl('p', {
-                text: 'No markdown file active or excluded',
+                text: 'No Markdown file active or excluded',
                 cls: 'no-tracking',
             });
         }
