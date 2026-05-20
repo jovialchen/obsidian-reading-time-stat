@@ -6,6 +6,8 @@ import {
     Plugin,
     PluginSettingTab,
     Setting,
+    TAbstractFile,
+    TFile,
     WorkspaceLeaf,
 } from 'obsidian';
 import type { ReadingTimeStatSettings, StatsData, PopularNote, TimeRange } from './types';
@@ -82,11 +84,42 @@ export default class ReadingTimeStatPlugin extends Plugin {
             callback: () => this.confirmClearStats(),
         });
 
+        this.addCommand({
+            id: 'clean-orphan-stats',
+            name: 'Clean orphan data',
+            callback: () => this.cleanOrphanStats(),
+        });
+
         // Add settings tab
         this.addSettingTab(new ReadingTimeStatSettingTab(this.app, this));
 
         // Start tracking
         this.tracker.start();
+
+        // Register vault event listeners for file lifecycle handling
+        this.registerEvent(
+            this.app.vault.on('delete', (file: TAbstractFile) => {
+                if (file instanceof TFile && file.extension === 'md') {
+                    this.tracker.handleFileDeleted(file.path);
+                    if (this.statsManager.deleteNote(file.path)) {
+                        void this.saveStats();
+                        this.getView()?.update();
+                    }
+                }
+            })
+        );
+
+        this.registerEvent(
+            this.app.vault.on('rename', (file: TAbstractFile, oldPath: string) => {
+                if (file instanceof TFile && file.extension === 'md') {
+                    this.tracker.handleFileRenamed(oldPath, file);
+                    if (this.statsManager.migrateNote(oldPath, file.path)) {
+                        void this.saveStats();
+                        this.getView()?.update();
+                    }
+                }
+            })
+        );
 
         // Register for cleanup on plugin unload
         this.register(() => this.tracker.stop());
@@ -150,7 +183,7 @@ export default class ReadingTimeStatPlugin extends Plugin {
             timeRange
         );
 
-        new PopularNotesModal(this.app, popularNotes, this.settings, this.statsManager, timeRange).open();
+        new PopularNotesModal(this.app, this, popularNotes, this.settings, this.statsManager, timeRange).open();
     }
 
     /**
@@ -189,6 +222,42 @@ export default class ReadingTimeStatPlugin extends Plugin {
                 new Notice('All statistics cleared');
             }
         ).open();
+    }
+
+    /**
+     * Remove stats for files that no longer exist in the vault
+     */
+    private async cleanOrphanStats(): Promise<void> {
+        const existingPaths = new Set(
+            this.app.vault.getMarkdownFiles().map((f) => f.path)
+        );
+        const removed = this.statsManager.removeOrphans(existingPaths);
+        if (removed > 0) {
+            await this.saveStats();
+            this.getView()?.update();
+            new Notice(`Removed stats for ${removed} missing note${removed === 1 ? '' : 's'}`);
+        } else {
+            new Notice('No orphan stats found');
+        }
+    }
+
+    /**
+     * Open a note by path, verifying it exists in the vault.
+     * Returns true if the file was opened.
+     */
+    openNoteIfExists(path: string): boolean {
+        const file = this.app.vault.getAbstractFileByPath(path);
+        if (file instanceof TFile) {
+            void this.app.workspace.openLinkText(path, '', true);
+            return true;
+        }
+        new Notice('Note no longer exists');
+        // Auto-cleanup the orphan entry
+        if (this.statsManager.deleteNote(path)) {
+            void this.saveStats();
+            this.getView()?.update();
+        }
+        return false;
     }
 
     /**
@@ -306,11 +375,16 @@ class ReadingTimeStatView extends ItemView {
         });
 
         // Popular notes section
-        const popularNotes = getPopularNotes(
+        const allPopularNotes = getPopularNotes(
             this.plugin.getStatsManager().getAllNotes(),
             this.plugin.getSettings(),
             this.plugin.getSettings().popularNotesLimit,
             this.currentTimeRange
+        );
+
+        // Fallback safety: filter out notes whose files no longer exist
+        const popularNotes = allPopularNotes.filter((note) =>
+            this.app.vault.getAbstractFileByPath(note.path) !== null
         );
 
         const popularDiv = container.createDiv({ cls: 'popular-notes' });
@@ -342,7 +416,7 @@ class ReadingTimeStatView extends ItemView {
                     text: note.name,
                     cls: 'note-name',
                 }).addEventListener('click', () => {
-                    void this.app.workspace.openLinkText(note.path, '', true);
+                    this.plugin.openNoteIfExists(note.path);
                 });
 
                 // Stats row
@@ -424,6 +498,7 @@ class ReadingTimeStatView extends ItemView {
  * Popular Notes Modal
  */
 class PopularNotesModal extends Modal {
+    private plugin: ReadingTimeStatPlugin;
     private notes: PopularNote[];
     private settings: ReadingTimeStatSettings;
     private statsManager: StatsManager;
@@ -432,12 +507,14 @@ class PopularNotesModal extends Modal {
 
     constructor(
         app: App,
+        plugin: ReadingTimeStatPlugin,
         notes: PopularNote[],
         settings: ReadingTimeStatSettings,
         statsManager: StatsManager,
         timeRange: TimeRange = 'all'
     ) {
         super(app);
+        this.plugin = plugin;
         this.notes = notes;
         this.settings = settings;
         this.statsManager = statsManager;
@@ -473,18 +550,23 @@ class PopularNotesModal extends Modal {
 
         // Table container for dynamic updates
         this.tableContainer = contentEl.createDiv({ cls: 'table-container' });
-        this.renderTable();
+        // Apply initial filter for non-existent files and render
+        this.updateNotes();
     }
 
     /**
      * Update notes when time range changes
      */
     private updateNotes(): void {
-        this.notes = getPopularNotes(
+        const all = getPopularNotes(
             this.statsManager.getAllNotes(),
             this.settings,
             this.settings.popularNotesLimit,
             this.currentTimeRange
+        );
+        // Fallback safety: filter out notes whose files no longer exist
+        this.notes = all.filter((note) =>
+            this.app.vault.getAbstractFileByPath(note.path) !== null
         );
         if (this.tableContainer) {
             this.tableContainer.empty();
@@ -529,8 +611,12 @@ class PopularNotesModal extends Modal {
             // Note name
             const noteCell = row.createEl('td');
             noteCell.createEl('a', { text: note.name }).addEventListener('click', () => {
-                void this.app.workspace.openLinkText(note.path, '', true);
-                this.close();
+                if (this.plugin.openNoteIfExists(note.path)) {
+                    this.close();
+                } else {
+                    // File missing — refresh list to remove it
+                    this.updateNotes();
+                }
             });
 
             // Stats

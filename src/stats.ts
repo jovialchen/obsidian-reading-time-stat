@@ -75,6 +75,41 @@ export class StatsManager {
     }
 
     /**
+     * Migrate stats from one path to another (when note is renamed/moved)
+     * If the new path already has stats, the old data is discarded to avoid
+     * conflicts.
+     */
+    migrateNote(oldPath: string, newPath: string): boolean {
+        if (oldPath === newPath) {
+            return false;
+        }
+        const stats = this.data.notes[oldPath];
+        if (!stats) {
+            return false;
+        }
+        if (!this.data.notes[newPath]) {
+            this.data.notes[newPath] = stats;
+        }
+        delete this.data.notes[oldPath];
+        return true;
+    }
+
+    /**
+     * Remove stats entries whose paths are not in the provided set of
+     * existing paths. Returns the number of entries removed.
+     */
+    removeOrphans(existingPaths: Set<string>): number {
+        let removed = 0;
+        for (const path of Object.keys(this.data.notes)) {
+            if (!existingPaths.has(path)) {
+                delete this.data.notes[path];
+                removed++;
+            }
+        }
+        return removed;
+    }
+
+    /**
      * Clear all statistics
      */
     clearAll(): void {

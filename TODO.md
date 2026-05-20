@@ -1,25 +1,25 @@
-# Roadmap & TODO List
+# 路线图 & 待办事项
 
-## v1.0.0 (Current)
+## v1.0.0（当前版本）
 
-- [x] Basic reading time tracking
-- [x] Popularity algorithm
-- [x] Sidebar view with real-time updates
-- [x] Popular notes modal with time range filter
-- [x] Exclusion rules (folders & patterns)
-- [x] Settings customization
-- [x] Export/Clear statistics commands
+- [x] 基础阅读时间追踪
+- [x] 热度算法
+- [x] 侧边栏实时更新视图
+- [x] 热门笔记弹窗（支持时间范围筛选）
+- [x] 排除规则（文件夹 & 模式匹配）
+- [x] 设置自定义
+- [x] 导出/清除统计数据命令
 
 ---
 
-## v1.0.1 - Data Integrity & Bug Fixes
+## v1.0.1 - 数据完整性 & Bug 修复
 
-### Critical: File Lifecycle Handling
-> **Problem**: When files are deleted, renamed, or moved, statistics become orphaned data. The `deleteNote` method exists but is never called.
+### 关键问题：文件生命周期处理
+> **问题描述**：当文件被删除、重命名或移动时，统计数据会变成孤立数据。`deleteNote` 方法存在但从未被调用。
 
-**Implementation:**
+**实现方案：**
 ```typescript
-// In main.ts onload()
+// 在 main.ts 的 onload() 中
 this.register(this.app.vault.on('delete', (file) => {
     if (file instanceof TFile && file.extension === 'md') {
         this.statsManager.deleteNote(file.path);
@@ -31,10 +31,10 @@ this.register(this.app.vault.on('rename', (file, oldPath) => {
     if (file instanceof TFile && file.extension === 'md') {
         const stats = this.statsManager.getNoteStats(oldPath);
         if (stats) {
-            // Option A: Delete old data (simple)
+            // 方案 A：删除旧数据（简单）
             this.statsManager.deleteNote(oldPath);
 
-            // Option B: Migrate data to new path (preserve history)
+            // 方案 B：迁移数据到新路径（保留历史）
             // this.statsManager.migrateNote(oldPath, file.path);
         }
         void this.saveStats();
@@ -42,180 +42,160 @@ this.register(this.app.vault.on('rename', (file, oldPath) => {
 }));
 ```
 
-- [ ] **Add vault event listeners for delete/rename**
-- [ ] **Add `migrateNote(oldPath, newPath)` method to StatsManager** (optional, for data preservation)
-- [ ] **Filter out non-existent files when displaying popular notes** (fallback safety)
-- [ ] **Add "Clean orphan data" command** to manually remove stats for deleted files
+- [x] **添加 vault 事件监听器（delete/rename）**
+- [x] **在 StatsManager 中添加 `migrateNote(oldPath, newPath)` 方法**（可选，用于数据保留）
+- [x] **显示热门笔记时过滤不存在的文件**（兜底安全措施）
+- [x] **添加"清理孤立数据"命令**，手动移除已删除文件的统计数据
 
-### Bug: Popular Notes Click on Deleted File
-> **Problem**: If a deleted file still has stats, clicking it in popular notes fails silently.
+### Bug：点击已删除文件的热门笔记
+> **问题描述**：如果已删除的文件仍有统计数据，在热门笔记中点击它会静默失败。
 
-- [ ] **Verify file exists before opening** (`this.app.vault.getAbstractFileByPath(note.path)`)
-- [ ] **Show warning notice if file not found**: "Note no longer exists"
-- [ ] **Remove from list if file doesn't exist** (auto-cleanup on display)
+- [x] **打开前验证文件是否存在**（`this.app.vault.getAbstractFileByPath(note.path)`）
+- [x] **文件不存在时显示警告通知**："笔记已不存在"
+- [x] **文件不存在时从列表中移除**（显示时自动清理）
 
 ---
 
-## v1.1.0 - UX Improvements
+## v1.1.0 - 用户体验改进
 
-### Visual Enhancements
-- [ ] **Add "no notes tracked" state** when stats are empty (first-time user guidance)
-- [ ] **Add visual indicator for excluded files** (e.g., show "Excluded" badge when viewing excluded file)
-- [ ] **Add graph/chart view** for reading trends over time (optional)
+### 视觉增强
+- [ ] **添加"暂无追踪笔记"状态**，统计为空时显示（新用户引导）
+- [ ] **为排除的文件添加视觉标识**（例如，查看被排除文件时显示"已排除"徽章）
+- [ ] **添加图表视图**，展示阅读趋势变化（可选）
 
-### Theme Compatibility
-> **Current status**: Most styles use CSS variables (`var(--text-normal)`, etc.) but rank badges use hardcoded colors.
+### 主题兼容性
+> **当前状态**：大部分样式使用 CSS 变量（`var(--text-normal)` 等），但排名徽章使用了硬编码颜色。
 
-**Hardcoded colors in styles.css:**
-- Rank badge #1 (gold): `#f1c40f`, `#f39c12` (lines 179, 451)
-- Rank badge #2 (silver): `#bdc3c7`, `#95a5a6` (line 456)
-- Rank badge #3 (bronze): `#d35400`, `#e67e22` (line 461)
+**styles.css 中的硬编码颜色：**
+- 排名徽章 #1（金色）：`#f1c40f`、`#f39c12`（第 179、451 行）
+- 排名徽章 #2（银色）：`#bdc3c7`、`#95a5a6`（第 456 行）
+- 排名徽章 #3（铜色）：`#d35400`、`#e67e22`（第 461 行）
 
-**Solutions:**
+**解决方案：**
 ```css
-/* Option A: Use theme accent colors */
+/* 方案 A：使用主题强调色 */
 .rank-badge.rank-first {
     background: var(--interactive-accent);
     color: var(--text-on-accent);
 }
 
-/* Option B: Use CSS color-mix() for subtle variations */
+/* 方案 B：使用 CSS color-mix() 实现细微变化 */
 .rank-badge.rank-first {
     background: color-mix(in srgb, var(--text-success) 70%, var(--background-secondary));
 }
 
-/* Option C: Define custom CSS variables in plugin */
+/* 方案 C：在插件中定义自定义 CSS 变量 */
 :root {
     --rts-rank-gold: #f1c40f;
     --rts-rank-silver: #bdc3c7;
     --rts-rank-bronze: #d35400;
 }
-/* Users can override in their theme/snippets */
+/* 用户可在主题/代码片段中覆盖 */
 ```
 
-- [ ] **Replace hardcoded rank badge colors** with CSS variables or theme-aware alternatives
-- [ ] **Test on popular themes** (Minimal, Dracula, Things, etc.)
-- [ ] **Add theme-specific CSS snippet examples** in README
-- [ ] **Verify accent colors work in both light and dark mode**
+- [ ] **将硬编码的排名徽章颜色替换为** CSS 变量或主题适配方案
+- [ ] **在主流主题上测试**（Minimal、Dracula、Things 等）
+- [ ] **在 README 中添加主题专用 CSS 代码片段示例**
+- [ ] **验证强调色在浅色和深色模式下均正常工作**
 
-### Interaction Improvements
-- [ ] **Double-click to open note** in popular list (currently only single click works in modal)
-- [ ] **Right-click context menu** on popular note item (open in new tab, copy path, delete stats)
-- [ ] **Keyboard shortcuts** in modal (arrow keys to navigate, Enter to open)
-- [ ] **Search/filter in popular notes modal** (filter by note name)
+### 交互改进
+- [ ] **双击打开笔记**（目前弹窗中仅支持单击）
+- [ ] **右键上下文菜单**（在新标签页打开、复制路径、删除统计）
+- [ ] **弹窗中的键盘快捷键**（方向键导航、回车打开）
+- [ ] **热门笔记弹窗中的搜索/筛选**（按笔记名称筛选）
 
-### Status Bar Integration
-- [ ] **Add optional status bar item** showing current session time
-- [ ] **Click status bar to open sidebar view**
-
----
-
-## v1.2.0 - Feature Enhancements
-
-### Statistics Enrichment
-- [ ] **Track edit time separately** from read time (`hasEdited` exists but not used in UI)
-- [ ] **Show "edited" badge** for notes that were edited during reading sessions
-- [ ] **Add "average session time"** metric per note
-- [ ] **Track daily reading goal** (optional feature with progress bar)
-
-### Data Analysis
-- [ ] **Reading heat map** - calendar view showing reading activity per day
-- [ ] **Weekly/Monthly summary** - aggregate stats notification or report
-- [ ] **Most productive time** - identify peak reading hours
-- [ ] **Streak tracking** - consecutive days with reading activity
-
-### Export & Integration
-- [ ] **Export as CSV** (for spreadsheet analysis)
-- [ ] **Export as Markdown report** (for journaling)
-- [ ] **Dataview integration** - expose stats as Dataview fields (optional)
-- [ ] **Sync stats across devices** (via Obsidian Sync or custom solution)
+### 状态栏集成
+- [ ] **添加可选的状态栏项**，显示当前会话时间
+- [ ] **点击状态栏打开侧边栏视图**
 
 ---
 
-## v1.3.0 - Performance & Scale
+## v1.2.0 - 功能增强
 
-### Large Vault Optimization
-> **Problem**: Vaults with thousands of notes may slow down getPopularNotes().
 
-- [ ] **Lazy load popular notes** (paginate, load on scroll)
-- [ ] **Cache popularity calculations** (recalculate only when stats change)
-- [ ] **Add debounce to UI updates** (currently 2s interval, could be smarter)
-- [ ] **Option to limit stats storage** (e.g., keep only top 500 notes)
 
-### Memory Optimization
-- [ ] **Lazy initialization** of tracker and stats manager
-- [ ] **Clean up intervals properly** (verify no memory leaks on plugin disable)
-- [ ] **Reduce save frequency** (30s interval, could save on file change only)
+### 数据分析
+- [ ] **阅读热力图** - 日历视图展示每日阅读活动
+- [ ] **周/月总结** - 聚合统计通知或报告
+- [ ] **最高效时段** - 识别阅读高峰时间
+- [ ] **连续追踪** - 连续阅读天数统计
 
----
-
-## v2.0.0 - Advanced Features
-
-### Multi-Device Sync
-- [ ] **Cloud sync for stats** (via Obsidian Sync or third-party)
-- [ ] **Conflict resolution** when stats differ across devices
-- [ ] **Merge algorithm** for combined reading history
-
-### Advanced Analytics
-- [ ] **AI-powered insights** - "You spend 30% more time on project notes"
-- [ ] **Recommendation engine** - "You might want to revisit X note"
-- [ ] **Reading pattern analysis** - identify topic clusters
-
-### Social Features (Optional)
-- [ ] **Share reading stats** - generate public report
-- [ ] **Compare with community** - aggregate anonymous stats
+### 导出 & 集成
+- [ ] **导出为 CSV**（用于电子表格分析）
+- [ ] **导出为 Markdown 报告**（用于日记记录）
+- [ ] **Dataview 集成** - 将统计数据暴露为 Dataview 字段（可选）
+- [ ] **跨设备同步统计数据**（通过 Obsidian Sync 或自定义方案）
 
 ---
 
-## Technical Debt & Code Quality
+## v1.3.0 - 性能 & 规模
 
-### Testing
-- [ ] **Add unit tests** for popularity calculation
-- [ ] **Add unit tests** for exclusion pattern matching
-- [ ] **Add integration tests** for tracker behavior
-- [ ] **Add mock Obsidian API** for testing without Obsidian runtime
+### 大型仓库优化
+> **问题描述**：拥有数千条笔记的仓库可能会拖慢 getPopularNotes() 的速度。
 
-### Code Improvements
-- [ ] **Split main.ts** into smaller modules (currently ~800 lines)
-  - `main.ts` - plugin class only (~100 lines)
-  - `view.ts` - sidebar view (~150 lines)
-  - `modal.ts` - modal components (~150 lines)
-  - `settings.ts` - settings tab (~100 lines)
-- [ ] **Add proper TypeScript strict mode** (verify `noUncheckedIndexedAccess`)
-- [ ] **Add JSDoc comments** for public methods
-- [ ] **Add error handling** for file operations (try-catch)
+- [ ] **懒加载热门笔记**（分页，滚动加载）
+- [ ] **缓存热度计算结果**（仅在统计数据变化时重新计算）
+- [ ] **为 UI 更新添加防抖**（当前 2 秒间隔，可以更智能）
+- [ ] **限制统计数据存储的选项**（例如，仅保留前 500 条笔记）
 
-### Documentation
-- [ ] **Add CHANGELOG.md** for version history
-- [ ] **Add CONTRIBUTING.md** with detailed guidelines
-- [ ] **Add inline code comments** for complex algorithms
-- [ ] **Update README** after each feature release
+### 内存优化
+- [ ] **延迟初始化** tracker 和 stats manager
+- [ ] **正确清理定时器**（验证插件禁用时无内存泄漏）
+- [ ] **降低保存频率**（当前 30 秒间隔，可改为仅在文件变化时保存）
 
 ---
 
-## Known Issues
 
-| Issue | Severity | Status |
-|-------|----------|--------|
-| Deleted/renamed files leave orphan stats | High | Planned for v1.0.1 |
-| Clicking deleted file in popular list fails | Medium | Planned for v1.0.1 |
-| Rank badges use hardcoded colors | Low | Planned for v1.1.0 |
-| No visual feedback when viewing excluded file | Low | Planned for v1.1.0 |
-| Main.ts file too large (800+ lines) | Low | Planned for refactor |
+
+## 技术债务 & 代码质量
+
+### 测试
+- [ ] **为热度计算添加单元测试**
+- [ ] **为排除模式匹配添加单元测试**
+- [ ] **为 tracker 行为添加集成测试**
+- [ ] **添加 Obsidian API Mock**，用于脱离 Obsidian 运行时的测试
+
+### 代码改进
+- [ ] **拆分 main.ts** 为更小的模块（当前约 800 行）
+  - `main.ts` - 仅插件类（约 100 行）
+  - `view.ts` - 侧边栏视图（约 150 行）
+  - `modal.ts` - 弹窗组件（约 150 行）
+  - `settings.ts` - 设置标签页（约 100 行）
+- [ ] **启用 TypeScript 严格模式**（验证 `noUncheckedIndexedAccess`）
+- [ ] **为公共方法添加 JSDoc 注释**
+- [ ] **为文件操作添加错误处理**（try-catch）
+
+### 文档
+- [ ] **添加 CHANGELOG.md** 记录版本历史
+- [ ] **添加 CONTRIBUTING.md** 包含详细贡献指南
+- [ ] **为复杂算法添加行内代码注释**
+- [ ] **每次功能发布后更新 README**
 
 ---
 
-## Contributing
+## 已知问题
 
-If you'd like to contribute to any of these features:
+| 问题 | 严重程度 | 状态 |
+|------|----------|------|
+| 删除/重命名文件留下孤立统计数据 | 高 | 计划在 v1.0.1 修复 |
+| 点击热门列表中已删除的文件失败 | 中 | 计划在 v1.0.1 修复 |
+| 排名徽章使用硬编码颜色 | 低 | 计划在 v1.1.0 修复 |
+| 查看被排除文件时无视觉反馈 | 低 | 计划在 v1.1.0 修复 |
+| main.ts 文件过大（800+ 行） | 低 | 计划重构 |
 
-1. Check the issue tracker on GitHub
-2. Comment on the issue you want to work on
-3. Submit a PR with tests and documentation
+---
 
-Priority order:
-1. **v1.0.1** - Data integrity (critical)
-2. **v1.1.0** - UX polish
-3. **v1.2.0** - New features
-4. **v1.3.0** - Performance
-5. **v2.0.0** - Advanced features
+## 贡献
+
+如果你想参与以上任何功能的开发：
+
+1. 查看 GitHub 上的 issue 追踪器
+2. 在你想参与的 issue 下留言
+3. 提交包含测试和文档的 PR
+
+优先级顺序：
+1. **v1.0.1** - 数据完整性（关键）
+2. **v1.1.0** - 用户体验优化
+3. **v1.2.0** - 新功能
+4. **v1.3.0** - 性能优化
+5. **v2.0.0** - 高级功能

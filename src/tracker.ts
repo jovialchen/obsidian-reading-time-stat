@@ -106,6 +106,28 @@ export class ReadingTimeTracker {
     }
 
     /**
+     * Notify the tracker that a tracked file has been deleted.
+     * Discards any in-flight session so its data is not saved against the
+     * (now removed) path.
+     */
+    handleFileDeleted(path: string): void {
+        if (this.currentFile?.path === path) {
+            this.stopTracking();
+        }
+    }
+
+    /**
+     * Notify the tracker that a tracked file has been renamed/moved.
+     * Persists any pending session under the new path so reading time is
+     * not lost.
+     */
+    handleFileRenamed(oldPath: string, newFile: TFile): void {
+        if (this.currentFile?.path === oldPath) {
+            this.currentFile = newFile;
+        }
+    }
+
+    /**
      * Get current tracking status for display
      */
     getStatus(): TrackingStatus {
