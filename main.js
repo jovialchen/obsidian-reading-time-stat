@@ -27,7 +27,7 @@ __export(main_exports, {
   default: () => ReadingTimeStatPlugin
 });
 module.exports = __toCommonJS(main_exports);
-var import_obsidian = require("obsidian");
+var import_obsidian2 = require("obsidian");
 
 // src/types.ts
 var TIME_RANGE_OPTIONS = [
@@ -51,8 +51,9 @@ var DEFAULT_SETTINGS = {
 };
 var DEFAULT_STATS_DATA = {
   notes: {},
+  dailyActivity: {},
   trackingStartedAt: (/* @__PURE__ */ new Date()).toISOString(),
-  version: 1
+  version: 2
 };
 
 // src/stats.ts
@@ -60,6 +61,18 @@ var StatsManager = class {
   constructor(data, settings) {
     this.data = data != null ? data : { ...DEFAULT_STATS_DATA };
     this.settings = settings;
+    this.migrateData();
+  }
+  /**
+   * Migrate older data versions to current schema.
+   */
+  migrateData() {
+    if (!this.data.dailyActivity) {
+      this.data.dailyActivity = {};
+    }
+    if (this.data.version < 2) {
+      this.data.version = 2;
+    }
   }
   /**
    * Get current stats data
@@ -74,24 +87,53 @@ var StatsManager = class {
     if (durationSeconds < this.settings.minSessionTime) {
       return;
     }
+    const now = /* @__PURE__ */ new Date();
     const existing = this.data.notes[path];
     if (existing) {
       existing.totalReadingTime += durationSeconds;
       existing.readingCount += 1;
-      existing.lastReadAt = (/* @__PURE__ */ new Date()).toISOString();
+      existing.lastReadAt = now.toISOString();
       if (wasEdited) {
         existing.hasEdited = true;
       }
     } else {
-      const now = (/* @__PURE__ */ new Date()).toISOString();
+      const iso = now.toISOString();
       this.data.notes[path] = {
         totalReadingTime: durationSeconds,
         readingCount: 1,
-        firstReadAt: now,
-        lastReadAt: now,
+        firstReadAt: iso,
+        lastReadAt: iso,
         hasEdited: wasEdited
       };
     }
+    this.recordDailyActivity(now, durationSeconds);
+  }
+  /**
+   * Record daily activity for heatmap and analytics.
+   * Uses local date strings (YYYY-MM-DD) and hour buckets (0-23).
+   */
+  recordDailyActivity(date, seconds) {
+    var _a, _b;
+    const localDate = this.formatLocalDate(date);
+    const hour = date.getHours().toString();
+    const activity = (_a = this.data.dailyActivity[localDate]) != null ? _a : {
+      totalSeconds: 0,
+      sessions: 0,
+      byHour: {}
+    };
+    activity.totalSeconds += seconds;
+    activity.sessions += 1;
+    activity.byHour[hour] = ((_b = activity.byHour[hour]) != null ? _b : 0) + seconds;
+    this.data.dailyActivity[localDate] = activity;
+  }
+  /**
+   * Format a Date as YYYY-MM-DD in local time.
+   */
+  formatLocalDate(date) {
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, "0");
+    const d = String(date.getDate()).padStart(2, "0");
+    return `${y}-${m}-${d}`;
   }
   /**
    * Get stats for a specific note
@@ -172,6 +214,108 @@ var StatsManager = class {
       totalTimeSeconds: totalTime,
       totalSessions,
       trackingStartedAt: this.data.trackingStartedAt
+    };
+  }
+  /**
+   * Get daily activity data for a range of dates.
+   * Returns a map from 'YYYY-MM-DD' to DailyActivity.
+   */
+  getDailyActivity(fromDate, toDate) {
+    const result = {};
+    const current = new Date(fromDate);
+    current.setHours(0, 0, 0, 0);
+    const end = new Date(toDate);
+    end.setHours(23, 59, 59, 999);
+    while (current <= end) {
+      const key = this.formatLocalDate(current);
+      if (this.data.dailyActivity[key]) {
+        result[key] = this.data.dailyActivity[key];
+      }
+      current.setDate(current.getDate() + 1);
+    }
+    return result;
+  }
+  /**
+   * Get all daily activity data.
+   */
+  getAllDailyActivity() {
+    return this.data.dailyActivity;
+  }
+  /**
+   * Compute streak: consecutive days with reading activity up to today.
+   */
+  getStreak() {
+    const today = /* @__PURE__ */ new Date();
+    today.setHours(0, 0, 0, 0);
+    const dates = Object.keys(this.data.dailyActivity).sort().reverse();
+    let current = 0;
+    const oneDayMs = 24 * 60 * 60 * 1e3;
+    let checkDate = new Date(today);
+    while (true) {
+      const key = this.formatLocalDate(checkDate);
+      if (this.data.dailyActivity[key]) {
+        current++;
+        checkDate = new Date(checkDate.getTime() - oneDayMs);
+      } else {
+        break;
+      }
+    }
+    let longest = 0;
+    let temp = 0;
+    const sorted = Object.keys(this.data.dailyActivity).sort();
+    let prev = null;
+    for (const d of sorted) {
+      const cur = /* @__PURE__ */ new Date(d + "T00:00:00");
+      if (prev === null || cur.getTime() - prev.getTime() > oneDayMs * 1.5) {
+        temp = 1;
+      } else {
+        temp++;
+      }
+      longest = Math.max(longest, temp);
+      prev = cur;
+    }
+    return { current, longest };
+  }
+  /**
+   * Find most productive hour (by total seconds) across all time.
+   */
+  getMostProductiveHour() {
+    var _a;
+    const hourTotals = {};
+    for (const activity of Object.values(this.data.dailyActivity)) {
+      for (const [h, s] of Object.entries(activity.byHour)) {
+        const hour = parseInt(h, 10);
+        hourTotals[hour] = ((_a = hourTotals[hour]) != null ? _a : 0) + s;
+      }
+    }
+    let best = null;
+    for (const [h, s] of Object.entries(hourTotals)) {
+      const hour = parseInt(h, 10);
+      if (!best || s > best.seconds) {
+        best = { hour, seconds: s };
+      }
+    }
+    return best;
+  }
+  /**
+   * Get summary for a date range (week, month, etc.)
+   */
+  getRangeSummary(fromDate, toDate) {
+    let totalSeconds = 0;
+    let sessions = 0;
+    let daysActive = 0;
+    const activity = this.getDailyActivity(fromDate, toDate);
+    for (const a of Object.values(activity)) {
+      totalSeconds += a.totalSeconds;
+      sessions += a.sessions;
+      daysActive++;
+    }
+    const days = Math.max(1, Math.round((toDate.getTime() - fromDate.getTime()) / (24 * 60 * 60 * 1e3)) + 1);
+    return {
+      totalSeconds,
+      sessions,
+      daysActive,
+      avgSecondsPerDay: Math.round(totalSeconds / days)
     };
   }
 };
@@ -473,9 +617,231 @@ function formatLastVisited(lastReadAt) {
   return lastRead.toLocaleDateString();
 }
 
+// src/analytics.ts
+var import_obsidian = require("obsidian");
+var HEAT_LEVELS = [
+  "var(--background-secondary-alt)",
+  "rgba(46, 204, 113, 0.2)",
+  "rgba(46, 204, 113, 0.35)",
+  "rgba(46, 204, 113, 0.5)",
+  "rgba(46, 204, 113, 0.7)"
+];
+function formatHour12(hour) {
+  if (hour === 0)
+    return "12a";
+  if (hour < 12)
+    return `${hour}a`;
+  if (hour === 12)
+    return "12p";
+  return `${hour - 12}p`;
+}
+function getHeatColor(seconds, maxSeconds) {
+  if (seconds === 0 || maxSeconds === 0)
+    return HEAT_LEVELS[0];
+  const ratio = seconds / maxSeconds;
+  const level = Math.min(HEAT_LEVELS.length - 1, Math.floor(ratio * HEAT_LEVELS.length));
+  return HEAT_LEVELS[level];
+}
+var AnalyticsModal = class extends import_obsidian.Modal {
+  constructor(app, statsManager, settings) {
+    super(app);
+    this.statsManager = statsManager;
+    this.settings = settings;
+  }
+  onOpen() {
+    const { contentEl } = this;
+    contentEl.addClass("rts-analytics-modal");
+    contentEl.createEl("h2", { text: "Reading Analytics" });
+    const streak = this.statsManager.getStreak();
+    const productiveHour = this.statsManager.getMostProductiveHour();
+    const insights = contentEl.createDiv({ cls: "rts-insights" });
+    const grid = insights.createDiv({ cls: "rts-insights-grid" });
+    const streakBox = grid.createDiv({ cls: "rts-insight-box" });
+    streakBox.createEl("div", { text: "\u{1F525}", cls: "rts-insight-icon" });
+    streakBox.createEl("div", { text: `${streak.current}`, cls: "rts-insight-value" });
+    streakBox.createEl("div", { text: "day streak", cls: "rts-insight-label" });
+    const longestBox = grid.createDiv({ cls: "rts-insight-box" });
+    longestBox.createEl("div", { text: "\u{1F3C6}", cls: "rts-insight-icon" });
+    longestBox.createEl("div", { text: `${streak.longest}`, cls: "rts-insight-value" });
+    longestBox.createEl("div", { text: "longest streak", cls: "rts-insight-label" });
+    if (productiveHour) {
+      const hourBox = grid.createDiv({ cls: "rts-insight-box" });
+      hourBox.createEl("div", { text: "\u23F0", cls: "rts-insight-icon" });
+      hourBox.createEl("div", { text: formatHour12(productiveHour.hour), cls: "rts-insight-value" });
+      hourBox.createEl("div", { text: "peak reading time", cls: "rts-insight-label" });
+    }
+    const now = /* @__PURE__ */ new Date();
+    const weekStart = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1e3);
+    const monthStart = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1e3);
+    const weekSum = this.statsManager.getRangeSummary(weekStart, now);
+    const monthSum = this.statsManager.getRangeSummary(monthStart, now);
+    const summary = contentEl.createDiv({ cls: "rts-summary-grid" });
+    const weekBox = summary.createDiv({ cls: "rts-summary-box" });
+    weekBox.createEl("h3", { text: "Last 7 Days" });
+    weekBox.createEl("p", { text: `Time: ${formatReadingTime(weekSum.totalSeconds)}` });
+    weekBox.createEl("p", { text: `Sessions: ${weekSum.sessions}` });
+    weekBox.createEl("p", { text: `Active days: ${weekSum.daysActive}` });
+    const monthBox = summary.createDiv({ cls: "rts-summary-box" });
+    monthBox.createEl("h3", { text: "Last 30 Days" });
+    monthBox.createEl("p", { text: `Time: ${formatReadingTime(monthSum.totalSeconds)}` });
+    monthBox.createEl("p", { text: `Sessions: ${monthSum.sessions}` });
+    monthBox.createEl("p", { text: `Active days: ${monthSum.daysActive}` });
+    monthBox.createEl("p", { text: `Avg/day: ${formatReadingTime(monthSum.avgSecondsPerDay)}` });
+    contentEl.createEl("h3", { text: "Reading Heatmap (Last 90 Days)", cls: "rts-heatmap-title" });
+    this.renderHeatmap(contentEl, 90);
+    contentEl.createEl("h3", { text: "Hourly Activity", cls: "rts-heatmap-title" });
+    this.renderHourlyChart(contentEl);
+    const exportDiv = contentEl.createDiv({ cls: "rts-export-section" });
+    exportDiv.createEl("h3", { text: "Export Data" });
+    new import_obsidian.Setting(exportDiv).setName("Export as CSV").setDesc("Download daily activity as CSV for spreadsheet analysis").addButton(
+      (btn) => btn.setButtonText("Export CSV").onClick(() => {
+        void this.exportCSV();
+      })
+    );
+    new import_obsidian.Setting(exportDiv).setName("Export as Markdown").setDesc("Generate a Markdown report in your vault").addButton(
+      (btn) => btn.setButtonText("Export Markdown").onClick(() => {
+        void this.exportMarkdown();
+      })
+    );
+  }
+  renderHeatmap(container, days) {
+    var _a;
+    const now = /* @__PURE__ */ new Date();
+    const startDate = new Date(now.getTime() - days * 24 * 60 * 60 * 1e3);
+    const activity = this.statsManager.getDailyActivity(startDate, now);
+    let maxSeconds = 0;
+    for (const a of Object.values(activity)) {
+      if (a.totalSeconds > maxSeconds)
+        maxSeconds = a.totalSeconds;
+    }
+    const heatmap = container.createDiv({ cls: "rts-heatmap" });
+    const dayLabels = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+    const labelCol = heatmap.createDiv({ cls: "rts-heatmap-labels" });
+    for (const d of dayLabels) {
+      labelCol.createEl("div", { text: d, cls: "rts-heatmap-label" });
+    }
+    const grid = heatmap.createDiv({ cls: "rts-heatmap-grid" });
+    const startDay = startDate.getDay();
+    for (let i = 0; i < startDay; i++) {
+      grid.createDiv({ cls: "rts-heatmap-cell empty" });
+    }
+    const current = new Date(startDate);
+    while (current <= now) {
+      const key = this.formatLocalDate(current);
+      const a = activity[key];
+      const cell = grid.createDiv({ cls: "rts-heatmap-cell" });
+      const seconds = (_a = a == null ? void 0 : a.totalSeconds) != null ? _a : 0;
+      cell.style.backgroundColor = getHeatColor(seconds, maxSeconds);
+      cell.setAttr("aria-label", `${key}: ${formatReadingTime(seconds)}`);
+      cell.setAttr("data-date", key);
+      current.setDate(current.getDate() + 1);
+    }
+    const legend = container.createDiv({ cls: "rts-heatmap-legend" });
+    legend.createEl("span", { text: "Less", cls: "rts-legend-label" });
+    for (const color of HEAT_LEVELS) {
+      const box = legend.createDiv({ cls: "rts-legend-box" });
+      box.style.backgroundColor = color;
+    }
+    legend.createEl("span", { text: "More", cls: "rts-legend-label" });
+  }
+  renderHourlyChart(container) {
+    const activity = this.statsManager.getAllDailyActivity();
+    const hourTotals = new Array(24).fill(0);
+    for (const a of Object.values(activity)) {
+      for (const [h, s] of Object.entries(a.byHour)) {
+        const hour = parseInt(h, 10);
+        if (hour >= 0 && hour < 24) {
+          hourTotals[hour] += s;
+        }
+      }
+    }
+    const maxHour = Math.max(...hourTotals, 1);
+    const chart = container.createDiv({ cls: "rts-hourly-chart" });
+    const bars = chart.createDiv({ cls: "rts-hourly-bars" });
+    for (let h = 0; h < 24; h++) {
+      const col = bars.createDiv({ cls: "rts-hourly-col" });
+      const bar = col.createDiv({ cls: "rts-hourly-bar" });
+      const pct = hourTotals[h] / maxHour * 100;
+      bar.style.height = `${Math.max(2, pct)}%`;
+      bar.setAttr("aria-label", `${formatHour12(h)}: ${formatReadingTime(hourTotals[h])}`);
+    }
+    const labels = chart.createDiv({ cls: "rts-hourly-labels" });
+    for (let h = 0; h < 24; h += 3) {
+      labels.createEl("span", { text: formatHour12(h), cls: "rts-hour-label" });
+    }
+  }
+  async exportCSV() {
+    const activity = this.statsManager.getAllDailyActivity();
+    const rows = ["Date,TotalSeconds,Sessions"];
+    const sorted = Object.keys(activity).sort();
+    for (const date of sorted) {
+      const a = activity[date];
+      rows.push(`${date},${a.totalSeconds},${a.sessions}`);
+    }
+    const content = rows.join("\n");
+    const fileName = `reading-activity-${this.formatLocalDate(/* @__PURE__ */ new Date())}.csv`;
+    const file = this.app.vault.getAbstractFileByPath(fileName);
+    if (file) {
+      await this.app.vault.modify(file, content);
+    } else {
+      await this.app.vault.create(fileName, content);
+    }
+    new import_obsidian.Notice(`Exported to ${fileName}`);
+  }
+  async exportMarkdown() {
+    const now = /* @__PURE__ */ new Date();
+    const weekStart = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1e3);
+    const monthStart = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1e3);
+    const weekSum = this.statsManager.getRangeSummary(weekStart, now);
+    const monthSum = this.statsManager.getRangeSummary(monthStart, now);
+    const streak = this.statsManager.getStreak();
+    const productiveHour = this.statsManager.getMostProductiveHour();
+    const lines = [];
+    lines.push("# Reading Statistics Report");
+    lines.push(`Generated: ${now.toLocaleString()}`);
+    lines.push("");
+    lines.push("## Streaks");
+    lines.push(`- Current streak: **${streak.current}** days`);
+    lines.push(`- Longest streak: **${streak.longest}** days`);
+    if (productiveHour) {
+      lines.push(`- Peak reading time: **${formatHour12(productiveHour.hour)}**`);
+    }
+    lines.push("");
+    lines.push("## Last 7 Days");
+    lines.push(`- Total time: ${formatReadingTime(weekSum.totalSeconds)}`);
+    lines.push(`- Sessions: ${weekSum.sessions}`);
+    lines.push(`- Active days: ${weekSum.daysActive}`);
+    lines.push("");
+    lines.push("## Last 30 Days");
+    lines.push(`- Total time: ${formatReadingTime(monthSum.totalSeconds)}`);
+    lines.push(`- Sessions: ${monthSum.sessions}`);
+    lines.push(`- Active days: ${monthSum.daysActive}`);
+    lines.push(`- Average per day: ${formatReadingTime(monthSum.avgSecondsPerDay)}`);
+    const content = lines.join("\n");
+    const fileName = `reading-report-${this.formatLocalDate(now)}.md`;
+    const file = this.app.vault.getAbstractFileByPath(fileName);
+    if (file) {
+      await this.app.vault.modify(file, content);
+    } else {
+      await this.app.vault.create(fileName, content);
+    }
+    new import_obsidian.Notice(`Exported to ${fileName}`);
+  }
+  formatLocalDate(date) {
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, "0");
+    const d = String(date.getDate()).padStart(2, "0");
+    return `${y}-${m}-${d}`;
+  }
+  onClose() {
+    const { contentEl } = this;
+    contentEl.empty();
+  }
+};
+
 // src/main.ts
 var VIEW_TYPE = "reading-time-stat-view";
-var ReadingTimeStatPlugin = class extends import_obsidian.Plugin {
+var ReadingTimeStatPlugin = class extends import_obsidian2.Plugin {
   constructor() {
     super(...arguments);
     this.statusBarEl = null;
@@ -527,13 +893,18 @@ var ReadingTimeStatPlugin = class extends import_obsidian.Plugin {
       name: "Clean orphan data",
       callback: () => this.cleanOrphanStats()
     });
+    this.addCommand({
+      id: "show-analytics",
+      name: "Show reading analytics",
+      callback: () => this.showAnalyticsModal()
+    });
     this.addSettingTab(new ReadingTimeStatSettingTab(this.app, this));
     this.setupStatusBar();
     this.tracker.start();
     this.registerEvent(
       this.app.vault.on("delete", (file) => {
         var _a;
-        if (file instanceof import_obsidian.TFile && file.extension === "md") {
+        if (file instanceof import_obsidian2.TFile && file.extension === "md") {
           this.tracker.handleFileDeleted(file.path);
           if (this.statsManager.deleteNote(file.path)) {
             void this.saveStats();
@@ -545,7 +916,7 @@ var ReadingTimeStatPlugin = class extends import_obsidian.Plugin {
     this.registerEvent(
       this.app.vault.on("rename", (file, oldPath) => {
         var _a;
-        if (file instanceof import_obsidian.TFile && file.extension === "md") {
+        if (file instanceof import_obsidian2.TFile && file.extension === "md") {
           this.tracker.handleFileRenamed(oldPath, file);
           if (this.statsManager.migrateNote(oldPath, file.path)) {
             void this.saveStats();
@@ -619,7 +990,7 @@ var ReadingTimeStatPlugin = class extends import_obsidian.Plugin {
     const fileName = `reading-stats-${(/* @__PURE__ */ new Date()).toISOString().split("T")[0]}.json`;
     const filePath = `${this.app.vault.configDir}/plugins/reading-time-stat/${fileName}`;
     await this.app.vault.adapter.write(filePath, JSON.stringify(data, null, 2));
-    new import_obsidian.Notice(`Stats exported to ${fileName}`);
+    new import_obsidian2.Notice(`Stats exported to ${fileName}`);
   }
   /**
    * Confirm and clear all statistics
@@ -636,7 +1007,7 @@ var ReadingTimeStatPlugin = class extends import_obsidian.Plugin {
         if (view) {
           view.update();
         }
-        new import_obsidian.Notice("All statistics cleared");
+        new import_obsidian2.Notice("All statistics cleared");
       }
     ).open();
   }
@@ -652,10 +1023,16 @@ var ReadingTimeStatPlugin = class extends import_obsidian.Plugin {
     if (removed > 0) {
       await this.saveStats();
       (_a = this.getView()) == null ? void 0 : _a.update();
-      new import_obsidian.Notice(`Removed stats for ${removed} missing note${removed === 1 ? "" : "s"}`);
+      new import_obsidian2.Notice(`Removed stats for ${removed} missing note${removed === 1 ? "" : "s"}`);
     } else {
-      new import_obsidian.Notice("No orphan stats found");
+      new import_obsidian2.Notice("No orphan stats found");
     }
+  }
+  /**
+   * Show reading analytics modal with heatmap and insights.
+   */
+  showAnalyticsModal() {
+    new AnalyticsModal(this.app, this.statsManager, this.settings).open();
   }
   /**
    * Open a note by path, verifying it exists in the vault.
@@ -664,11 +1041,11 @@ var ReadingTimeStatPlugin = class extends import_obsidian.Plugin {
   openNoteIfExists(path) {
     var _a;
     const file = this.app.vault.getAbstractFileByPath(path);
-    if (file instanceof import_obsidian.TFile) {
+    if (file instanceof import_obsidian2.TFile) {
       void this.app.workspace.openLinkText(path, "", true);
       return true;
     }
-    new import_obsidian.Notice("Note no longer exists");
+    new import_obsidian2.Notice("Note no longer exists");
     if (this.statsManager.deleteNote(path)) {
       void this.saveStats();
       (_a = this.getView()) == null ? void 0 : _a.update();
@@ -679,7 +1056,7 @@ var ReadingTimeStatPlugin = class extends import_obsidian.Plugin {
    * Show a context menu for a popular note item.
    */
   showNoteContextMenu(event, path, onChange) {
-    const menu = new import_obsidian.Menu();
+    const menu = new import_obsidian2.Menu();
     const file = this.app.vault.getAbstractFileByPath(path);
     menu.addItem(
       (item) => item.setTitle("Open").setIcon("file").onClick(() => {
@@ -688,7 +1065,7 @@ var ReadingTimeStatPlugin = class extends import_obsidian.Plugin {
     );
     menu.addItem(
       (item) => item.setTitle("Open in new tab").setIcon("lucide-external-link").onClick(() => {
-        if (file instanceof import_obsidian.TFile) {
+        if (file instanceof import_obsidian2.TFile) {
           void this.app.workspace.getLeaf("tab").openFile(file);
         } else {
           this.openNoteIfExists(path);
@@ -698,7 +1075,7 @@ var ReadingTimeStatPlugin = class extends import_obsidian.Plugin {
     menu.addItem(
       (item) => item.setTitle("Copy path").setIcon("lucide-copy").onClick(() => {
         void navigator.clipboard.writeText(path);
-        new import_obsidian.Notice("Path copied");
+        new import_obsidian2.Notice("Path copied");
       })
     );
     menu.addSeparator();
@@ -709,7 +1086,7 @@ var ReadingTimeStatPlugin = class extends import_obsidian.Plugin {
           await this.saveStats();
           (_a = this.getView()) == null ? void 0 : _a.update();
           onChange == null ? void 0 : onChange();
-          new import_obsidian.Notice("Stats deleted");
+          new import_obsidian2.Notice("Stats deleted");
         }
       })
     );
@@ -778,11 +1155,20 @@ var ReadingTimeStatPlugin = class extends import_obsidian.Plugin {
     return null;
   }
 };
-var ReadingTimeStatView = class extends import_obsidian.ItemView {
+var ReadingTimeStatView = class extends import_obsidian2.ItemView {
   constructor(leaf, plugin) {
     super(leaf);
     this.currentTimeRange = "all";
     this.plugin = plugin;
+  }
+  formatHour12(hour) {
+    if (hour === 0)
+      return "12a";
+    if (hour < 12)
+      return `${hour}a`;
+    if (hour === 12)
+      return "12p";
+    return `${hour - 12}p`;
   }
   getViewType() {
     return VIEW_TYPE;
@@ -834,6 +1220,21 @@ var ReadingTimeStatView = class extends import_obsidian.ItemView {
     });
     summaryDiv.createEl("p", {
       text: `${summary.totalSessions} reading sessions`
+    });
+    const streak = this.plugin.getStatsManager().getStreak();
+    const peak = this.plugin.getStatsManager().getMostProductiveHour();
+    const streakLine = summaryDiv.createEl("p", { cls: "rts-summary-streak" });
+    streakLine.createEl("span", { text: `\u{1F525} ${streak.current} day streak` });
+    if (peak) {
+      streakLine.createEl("span", { text: " \xB7 " });
+      streakLine.createEl("span", { text: `\u23F0 ${this.formatHour12(peak.hour)} peak` });
+    }
+    const analyticsBtn = summaryDiv.createEl("button", {
+      text: "View Analytics & Heatmap",
+      cls: "rts-analytics-btn"
+    });
+    analyticsBtn.addEventListener("click", () => {
+      this.plugin.showAnalyticsModal();
     });
     const filterDiv = container.createDiv({ cls: "time-range-filter" });
     filterDiv.createEl("span", { text: "Time range: ", cls: "filter-label" });
@@ -976,7 +1377,7 @@ var ReadingTimeStatView = class extends import_obsidian.ItemView {
     }
   }
 };
-var PopularNotesModal = class extends import_obsidian.Modal {
+var PopularNotesModal = class extends import_obsidian2.Modal {
   constructor(app, plugin, notes, settings, statsManager, timeRange = "all") {
     super(app);
     this.filteredNotes = [];
@@ -1172,7 +1573,7 @@ var PopularNotesModal = class extends import_obsidian.Modal {
     contentEl.empty();
   }
 };
-var ConfirmModal = class extends import_obsidian.Modal {
+var ConfirmModal = class extends import_obsidian2.Modal {
   constructor(app, title, message, onConfirm) {
     super(app);
     this.title = title;
@@ -1195,7 +1596,7 @@ var ConfirmModal = class extends import_obsidian.Modal {
     contentEl.empty();
   }
 };
-var ReadingTimeStatSettingTab = class extends import_obsidian.PluginSettingTab {
+var ReadingTimeStatSettingTab = class extends import_obsidian2.PluginSettingTab {
   constructor(app, plugin) {
     super(app, plugin);
     this.plugin = plugin;
@@ -1203,26 +1604,26 @@ var ReadingTimeStatSettingTab = class extends import_obsidian.PluginSettingTab {
   display() {
     const { containerEl } = this;
     containerEl.empty();
-    new import_obsidian.Setting(containerEl).setName("Configuration").setHeading();
-    new import_obsidian.Setting(containerEl).setName("Reading time weight").setDesc("Weight for reading time in popularity calculation (per minute)").addSlider(
+    new import_obsidian2.Setting(containerEl).setName("Configuration").setHeading();
+    new import_obsidian2.Setting(containerEl).setName("Reading time weight").setDesc("Weight for reading time in popularity calculation (per minute)").addSlider(
       (slider) => slider.setLimits(0.1, 5, 0.1).setValue(this.plugin.getSettings().readingTimeWeight).setDynamicTooltip().onChange((value) => {
         this.plugin.getSettings().readingTimeWeight = value;
         void this.plugin.saveSettings();
       })
     );
-    new import_obsidian.Setting(containerEl).setName("Reading count weight").setDesc("Weight for reading count in popularity calculation").addSlider(
+    new import_obsidian2.Setting(containerEl).setName("Reading count weight").setDesc("Weight for reading count in popularity calculation").addSlider(
       (slider) => slider.setLimits(1, 20, 1).setValue(this.plugin.getSettings().readingCountWeight).setDynamicTooltip().onChange((value) => {
         this.plugin.getSettings().readingCountWeight = value;
         void this.plugin.saveSettings();
       })
     );
-    new import_obsidian.Setting(containerEl).setName("Recency decay factor").setDesc("How much popularity decays per day since last read").addSlider(
+    new import_obsidian2.Setting(containerEl).setName("Recency decay factor").setDesc("How much popularity decays per day since last read").addSlider(
       (slider) => slider.setLimits(0, 0.5, 0.01).setValue(this.plugin.getSettings().recencyDecayFactor).setDynamicTooltip().onChange((value) => {
         this.plugin.getSettings().recencyDecayFactor = value;
         void this.plugin.saveSettings();
       })
     );
-    new import_obsidian.Setting(containerEl).setName("Popular notes limit").setDesc("Maximum number of popular notes to display").addText(
+    new import_obsidian2.Setting(containerEl).setName("Popular notes limit").setDesc("Maximum number of popular notes to display").addText(
       (text) => text.setValue(String(this.plugin.getSettings().popularNotesLimit)).onChange((value) => {
         var _a;
         const num = parseInt(value);
@@ -1233,7 +1634,7 @@ var ReadingTimeStatSettingTab = class extends import_obsidian.PluginSettingTab {
         }
       })
     );
-    new import_obsidian.Setting(containerEl).setName("Minimum session time").setDesc("Minimum seconds to count as a reading session").addText(
+    new import_obsidian2.Setting(containerEl).setName("Minimum session time").setDesc("Minimum seconds to count as a reading session").addText(
       (text) => text.setValue(String(this.plugin.getSettings().minSessionTime)).onChange((value) => {
         const num = parseInt(value);
         if (num >= 0) {
@@ -1242,25 +1643,25 @@ var ReadingTimeStatSettingTab = class extends import_obsidian.PluginSettingTab {
         }
       })
     );
-    new import_obsidian.Setting(containerEl).setName("Show status bar").setDesc("Display the current session time in the status bar. Click it to open the stats sidebar.").addToggle(
+    new import_obsidian2.Setting(containerEl).setName("Show status bar").setDesc("Display the current session time in the status bar. Click it to open the stats sidebar.").addToggle(
       (toggle) => toggle.setValue(this.plugin.getSettings().showStatusBar).onChange((value) => {
         this.plugin.getSettings().showStatusBar = value;
         void this.plugin.saveSettings();
         this.plugin.setupStatusBar();
       })
     );
-    new import_obsidian.Setting(containerEl).setName("Exclusions").setHeading();
+    new import_obsidian2.Setting(containerEl).setName("Exclusions").setHeading();
     containerEl.createEl("p", {
       text: "Exclude certain folders or files from tracking (e.g., kanban boards, templates, todo lists)",
       cls: "settings-section-desc"
     });
-    new import_obsidian.Setting(containerEl).setName("Excluded folders").setDesc("Folder paths to exclude, one per line. Example: kanban/, templates/").addTextArea(
+    new import_obsidian2.Setting(containerEl).setName("Excluded folders").setDesc("Folder paths to exclude, one per line. Example: kanban/, templates/").addTextArea(
       (text) => text.setPlaceholder("kanban/\ntemplates/\narchive/").setValue(this.plugin.getSettings().excludedFolders.join("\n")).onChange((value) => {
         this.plugin.getSettings().excludedFolders = value.split("\n").map((s) => s.trim()).filter((s) => s.length > 0);
         void this.plugin.saveSettings();
       })
     );
-    new import_obsidian.Setting(containerEl).setName("Excluded file patterns").setDesc("File name patterns to exclude, supports * wildcard. One per line. Example: todo-*, *-kanban").addTextArea(
+    new import_obsidian2.Setting(containerEl).setName("Excluded file patterns").setDesc("File name patterns to exclude, supports * wildcard. One per line. Example: todo-*, *-kanban").addTextArea(
       (text) => text.setPlaceholder("todo-*\n*-kanban\ndaily note*").setValue(this.plugin.getSettings().excludedPatterns.join("\n")).onChange((value) => {
         this.plugin.getSettings().excludedPatterns = value.split("\n").map((s) => s.trim()).filter((s) => s.length > 0);
         void this.plugin.saveSettings();

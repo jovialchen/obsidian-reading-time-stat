@@ -15,11 +15,25 @@ export interface NoteStats {
 }
 
 /**
+ * Per-day reading activity. Keys are local-date strings `YYYY-MM-DD`.
+ */
+export interface DailyActivity {
+    /** Total reading seconds recorded on this date */
+    totalSeconds: number;
+    /** Number of reading sessions ended on this date */
+    sessions: number;
+    /** Seconds distributed by hour-of-day bucket (0-23) */
+    byHour: Record<string, number>;
+}
+
+/**
  * All statistics data persisted by the plugin
  */
 export interface StatsData {
     /** Map of file path to its statistics */
     notes: Record<string, NoteStats>;
+    /** Per-day activity log for heatmaps, streaks, summaries */
+    dailyActivity: Record<string, DailyActivity>;
     /** ISO timestamp of when tracking started */
     trackingStartedAt: string;
     /** Plugin version for migration purposes */
@@ -94,6 +108,7 @@ export const DEFAULT_SETTINGS: ReadingTimeStatSettings = {
 
 export const DEFAULT_STATS_DATA: StatsData = {
     notes: {},
+    dailyActivity: {},
     trackingStartedAt: new Date().toISOString(),
-    version: 1,
+    version: 2,
 };

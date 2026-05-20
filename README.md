@@ -68,16 +68,30 @@ npm run build
 |---------|-------------|
 | `Open Statistics View` | Open the sidebar panel with overview stats |
 | `Show Popular Notes` | Open a modal with full ranking table |
+| `Show Reading Analytics` | Open heatmap, streaks, peak hours, and export options |
 | `Export Statistics` | Save stats as JSON file |
 | `Clear All Statistics` | Reset all tracked data |
+| `Clean Orphan Data` | Remove stats for deleted files |
 
 ### Sidebar Panel
 
 The sidebar shows:
 - **Overview** - Total notes tracked, total time, sessions count
+- **Streak & Peak** - Current reading streak and most productive hour
 - **Time Range Filter** - Filter popular notes by time period
-- **Popular Notes** - Top 10 notes with quick stats
+- **Popular Notes** - Top notes with quick stats
 - **Currently Tracking** - Real-time session info with live timer
+
+### Analytics Modal
+
+Open via command palette or the "View Analytics" button in the sidebar:
+
+- **Streaks** - Current and longest consecutive reading days
+- **Peak Hour** - Your most productive reading time
+- **Weekly/Monthly Summary** - Time, sessions, active days
+- **Heatmap** - 90-day calendar showing daily reading activity
+- **Hourly Chart** - Distribution of reading across hours
+- **Export** - CSV for spreadsheets, Markdown for journals
 
 ### Popularity Formula
 

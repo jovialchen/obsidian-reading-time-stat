@@ -17,6 +17,7 @@ import { StatsManager } from './stats';
 import { ReadingTimeTracker } from './tracker';
 import { getPopularNotes, formatReadingTime, formatLastVisited } from './popularity';
 import { shouldExclude } from './exclusions';
+import { AnalyticsModal } from './analytics';
 
 const VIEW_TYPE = 'reading-time-stat-view';
 
@@ -92,6 +93,12 @@ export default class ReadingTimeStatPlugin extends Plugin {
             id: 'clean-orphan-stats',
             name: 'Clean orphan data',
             callback: () => this.cleanOrphanStats(),
+        });
+
+        this.addCommand({
+            id: 'show-analytics',
+            name: 'Show reading analytics',
+            callback: () => this.showAnalyticsModal(),
         });
 
         // Add settings tab
@@ -246,6 +253,13 @@ export default class ReadingTimeStatPlugin extends Plugin {
         } else {
             new Notice('No orphan stats found');
         }
+    }
+
+    /**
+     * Show reading analytics modal with heatmap and insights.
+     */
+    showAnalyticsModal(): void {
+        new AnalyticsModal(this.app, this.statsManager, this.settings).open();
     }
 
     /**
@@ -405,6 +419,13 @@ class ReadingTimeStatView extends ItemView {
         this.plugin = plugin;
     }
 
+    private formatHour12(hour: number): string {
+        if (hour === 0) return '12a';
+        if (hour < 12) return `${hour}a`;
+        if (hour === 12) return '12p';
+        return `${hour - 12}p`;
+    }
+
     getViewType(): string {
         return VIEW_TYPE;
     }
@@ -467,6 +488,25 @@ class ReadingTimeStatView extends ItemView {
         });
         summaryDiv.createEl('p', {
             text: `${summary.totalSessions} reading sessions`,
+        });
+
+        // Streak and peak hour
+        const streak = this.plugin.getStatsManager().getStreak();
+        const peak = this.plugin.getStatsManager().getMostProductiveHour();
+        const streakLine = summaryDiv.createEl('p', { cls: 'rts-summary-streak' });
+        streakLine.createEl('span', { text: `🔥 ${streak.current} day streak` });
+        if (peak) {
+            streakLine.createEl('span', { text: ' · ' });
+            streakLine.createEl('span', { text: `⏰ ${this.formatHour12(peak.hour)} peak` });
+        }
+
+        // Analytics button
+        const analyticsBtn = summaryDiv.createEl('button', {
+            text: 'View Analytics & Heatmap',
+            cls: 'rts-analytics-btn',
+        });
+        analyticsBtn.addEventListener('click', () => {
+            this.plugin.showAnalyticsModal();
         });
 
         // Time range selector
