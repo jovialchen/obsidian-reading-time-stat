@@ -115,6 +115,36 @@ todo-*
 Daily Note*
 ```
 
+## 🎨 主题适配
+
+插件大量使用 Obsidian 的 CSS 变量（`--text-normal`、`--interactive-accent` 等），可自动跟随主题色。排名徽章额外提供专用变量，可通过 CSS 代码片段覆盖，无需修改插件源码。
+
+在 **设置 → 外观 → CSS 代码片段** 中添加：
+
+```css
+/* 让徽章跟随主题强调色 */
+:root {
+    --rts-rank-gold-1: var(--interactive-accent);
+    --rts-rank-gold-2: var(--interactive-accent-hover);
+    --rts-rank-silver-1: var(--text-muted);
+    --rts-rank-silver-2: var(--text-faint);
+    --rts-rank-bronze-1: var(--text-accent);
+    --rts-rank-bronze-2: var(--text-accent-hover);
+    --rts-rank-text: var(--text-on-accent);
+}
+```
+
+可覆盖的变量：
+
+| 变量 | 默认值 | 用途 |
+|------|--------|------|
+| `--rts-rank-gold-1` / `-2` | `#f1c40f` / `#f39c12` | 第一名徽章 |
+| `--rts-rank-silver-1` / `-2` | `#bdc3c7` / `#95a5a6` | 第二名徽章 |
+| `--rts-rank-bronze-1` / `-2` | `#d35400` / `#e67e22` | 第三名徽章 |
+| `--rts-rank-text` | `#fff` | 徽章文字颜色 |
+| `--rts-top-row-tint` / `-hover` | 金色 8% / 12% | 弹窗中第一名行底色 |
+| `--rts-first-item-tint` / `-hover` | 绿色 8% / 12% | 侧边栏第一项底色 |
+
 ## 📁 数据存储
 
 统计数据存储在 `.obsidian/plugins/reading-time-stat/data.json`：

@@ -115,6 +115,45 @@ todo-*
 Daily Note*
 ```
 
+## 🎨 Theming
+
+The plugin uses Obsidian's CSS variables (`--text-normal`, `--interactive-accent`, etc.) so it inherits your active theme. Rank badges expose dedicated variables so they can be customized via CSS snippets without forking the plugin.
+
+Add a snippet under **Settings → Appearance → CSS snippets** to override colors:
+
+```css
+/* Make rank badges follow the theme accent color */
+:root {
+    --rts-rank-gold-1: var(--interactive-accent);
+    --rts-rank-gold-2: var(--interactive-accent-hover);
+    --rts-rank-silver-1: var(--text-muted);
+    --rts-rank-silver-2: var(--text-faint);
+    --rts-rank-bronze-1: var(--text-accent);
+    --rts-rank-bronze-2: var(--text-accent-hover);
+    --rts-rank-text: var(--text-on-accent);
+}
+```
+
+Or use color-mix for subtle accents:
+
+```css
+:root {
+    --rts-rank-gold-1: color-mix(in srgb, var(--text-success) 80%, var(--background-secondary));
+    --rts-rank-gold-2: color-mix(in srgb, var(--text-success) 60%, var(--background-secondary));
+}
+```
+
+All overridable variables:
+
+| Variable | Default | Used by |
+|----------|---------|---------|
+| `--rts-rank-gold-1` / `-2` | `#f1c40f` / `#f39c12` | #1 badge |
+| `--rts-rank-silver-1` / `-2` | `#bdc3c7` / `#95a5a6` | #2 badge |
+| `--rts-rank-bronze-1` / `-2` | `#d35400` / `#e67e22` | #3 badge |
+| `--rts-rank-text` | `#fff` | Badge text color |
+| `--rts-top-row-tint` / `-hover` | gold 8% / 12% | Top note row in modal |
+| `--rts-first-item-tint` / `-hover` | green 8% / 12% | First sidebar item |
+
 ## 📁 Data Storage
 
 Statistics are stored in `.obsidian/plugins/reading-time-stat/data.json`:

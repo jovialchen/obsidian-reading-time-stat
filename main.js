@@ -46,7 +46,8 @@ var DEFAULT_SETTINGS = {
   trackingInterval: 1e3,
   popularNotesLimit: 20,
   excludedFolders: [],
-  excludedPatterns: []
+  excludedPatterns: [],
+  showStatusBar: true
 };
 var DEFAULT_STATS_DATA = {
   notes: {},
@@ -475,6 +476,10 @@ function formatLastVisited(lastReadAt) {
 // src/main.ts
 var VIEW_TYPE = "reading-time-stat-view";
 var ReadingTimeStatPlugin = class extends import_obsidian.Plugin {
+  constructor() {
+    super(...arguments);
+    this.statusBarEl = null;
+  }
   async onload() {
     const savedData = await this.loadData();
     this.settings = Object.assign({}, DEFAULT_SETTINGS, savedData == null ? void 0 : savedData.settings);
@@ -490,6 +495,7 @@ var ReadingTimeStatPlugin = class extends import_obsidian.Plugin {
         if (view) {
           view.update();
         }
+        this.updateStatusBar();
       }
     );
     this.registerView(VIEW_TYPE, (leaf) => new ReadingTimeStatView(leaf, this));
@@ -522,6 +528,7 @@ var ReadingTimeStatPlugin = class extends import_obsidian.Plugin {
       callback: () => this.cleanOrphanStats()
     });
     this.addSettingTab(new ReadingTimeStatSettingTab(this.app, this));
+    this.setupStatusBar();
     this.tracker.start();
     this.registerEvent(
       this.app.vault.on("delete", (file) => {
@@ -669,6 +676,80 @@ var ReadingTimeStatPlugin = class extends import_obsidian.Plugin {
     return false;
   }
   /**
+   * Show a context menu for a popular note item.
+   */
+  showNoteContextMenu(event, path, onChange) {
+    const menu = new import_obsidian.Menu();
+    const file = this.app.vault.getAbstractFileByPath(path);
+    menu.addItem(
+      (item) => item.setTitle("Open").setIcon("file").onClick(() => {
+        this.openNoteIfExists(path);
+      })
+    );
+    menu.addItem(
+      (item) => item.setTitle("Open in new tab").setIcon("lucide-external-link").onClick(() => {
+        if (file instanceof import_obsidian.TFile) {
+          void this.app.workspace.getLeaf("tab").openFile(file);
+        } else {
+          this.openNoteIfExists(path);
+        }
+      })
+    );
+    menu.addItem(
+      (item) => item.setTitle("Copy path").setIcon("lucide-copy").onClick(() => {
+        void navigator.clipboard.writeText(path);
+        new import_obsidian.Notice("Path copied");
+      })
+    );
+    menu.addSeparator();
+    menu.addItem(
+      (item) => item.setTitle("Delete stats for this note").setIcon("lucide-trash-2").onClick(async () => {
+        var _a;
+        if (this.statsManager.deleteNote(path)) {
+          await this.saveStats();
+          (_a = this.getView()) == null ? void 0 : _a.update();
+          onChange == null ? void 0 : onChange();
+          new import_obsidian.Notice("Stats deleted");
+        }
+      })
+    );
+    menu.showAtMouseEvent(event);
+  }
+  /**
+   * Create or remove the status bar item based on settings.
+   */
+  setupStatusBar() {
+    if (this.settings.showStatusBar) {
+      if (!this.statusBarEl) {
+        this.statusBarEl = this.addStatusBarItem();
+        this.statusBarEl.addClass("reading-time-stat-status");
+        this.statusBarEl.setAttr("aria-label", "Open reading time stats");
+        this.statusBarEl.addEventListener("click", () => {
+          void this.activateView();
+        });
+      }
+      this.updateStatusBar();
+    } else if (this.statusBarEl) {
+      this.statusBarEl.remove();
+      this.statusBarEl = null;
+    }
+  }
+  /**
+   * Refresh the status bar with the current session time.
+   */
+  updateStatusBar() {
+    if (!this.statusBarEl)
+      return;
+    const status = this.tracker.getStatus();
+    if (status.filePath) {
+      this.statusBarEl.setText(`\u{1F4D6} ${formatReadingTime(status.currentSessionTime)}`);
+      this.statusBarEl.style.cursor = "pointer";
+    } else {
+      this.statusBarEl.setText("\u{1F4D6} \u2014");
+      this.statusBarEl.style.cursor = "pointer";
+    }
+  }
+  /**
    * Get stats manager for view access
    */
   getStatsManager() {
@@ -730,6 +811,19 @@ var ReadingTimeStatView = class extends import_obsidian.ItemView {
     container.empty();
     container.addClass("reading-time-stat-container");
     const summary = this.plugin.getStatsManager().getSummary();
+    if (summary.totalNotes === 0) {
+      const empty = container.createDiv({ cls: "rts-empty-state" });
+      empty.createEl("div", { text: "\u{1F4D6}", cls: "rts-empty-icon" });
+      empty.createEl("h3", { text: "No notes tracked yet" });
+      empty.createEl("p", {
+        text: "Open and read any markdown note to start tracking your reading time. Stats appear here automatically."
+      });
+      empty.createEl("p", {
+        text: `Sessions count once you read for at least ${this.plugin.getSettings().minSessionTime} seconds.`,
+        cls: "rts-empty-hint"
+      });
+      return;
+    }
     const summaryDiv = container.createDiv({ cls: "stats-summary" });
     summaryDiv.createEl("h3", { text: "Overview" });
     summaryDiv.createEl("p", {
@@ -788,11 +882,24 @@ var ReadingTimeStatView = class extends import_obsidian.ItemView {
         rankBadge.textContent = `#${i + 1}`;
         if (i === 0)
           rankBadge.addClass("rank-first");
-        item.createEl("a", {
+        else if (i === 1)
+          rankBadge.addClass("rank-second");
+        else if (i === 2)
+          rankBadge.addClass("rank-third");
+        const link = item.createEl("a", {
           text: note.name,
           cls: "note-name"
-        }).addEventListener("click", () => {
+        });
+        link.addEventListener("click", () => {
           this.plugin.openNoteIfExists(note.path);
+        });
+        link.addEventListener("dblclick", (e) => {
+          e.preventDefault();
+          this.plugin.openNoteIfExists(note.path);
+        });
+        item.addEventListener("contextmenu", (e) => {
+          e.preventDefault();
+          this.plugin.showNoteContextMenu(e, note.path, () => this.update());
         });
         const statsRow = item.createDiv({ cls: "stats-row" });
         statsRow.createEl("span", {
@@ -850,17 +957,34 @@ var ReadingTimeStatView = class extends import_obsidian.ItemView {
         });
       }
     } else {
-      trackingDiv.createEl("p", {
-        text: "No Markdown file active or excluded",
-        cls: "no-tracking"
-      });
+      const activeFile = this.app.workspace.getActiveFile();
+      if (activeFile && activeFile.extension === "md" && shouldExclude(activeFile.path, this.plugin.getSettings())) {
+        const excluded = trackingDiv.createDiv({ cls: "no-tracking excluded" });
+        excluded.createEl("span", {
+          text: "Excluded",
+          cls: "excluded-badge"
+        });
+        excluded.createEl("span", {
+          text: " This note matches an exclusion rule."
+        });
+      } else {
+        trackingDiv.createEl("p", {
+          text: "No Markdown file active",
+          cls: "no-tracking"
+        });
+      }
     }
   }
 };
 var PopularNotesModal = class extends import_obsidian.Modal {
   constructor(app, plugin, notes, settings, statsManager, timeRange = "all") {
     super(app);
+    this.filteredNotes = [];
     this.tableContainer = null;
+    this.searchQuery = "";
+    this.selectedIndex = 0;
+    this.rowEls = [];
+    this.boundKeyHandler = null;
     this.plugin = plugin;
     this.notes = notes;
     this.settings = settings;
@@ -888,8 +1012,20 @@ var PopularNotesModal = class extends import_obsidian.Modal {
       this.currentTimeRange = target.value;
       this.updateNotes();
     });
+    const searchInput = filterDiv.createEl("input", {
+      cls: "modal-search-input",
+      type: "search",
+      attr: { placeholder: "Search notes\u2026" }
+    });
+    searchInput.addEventListener("input", (e) => {
+      this.searchQuery = e.target.value.toLowerCase();
+      this.applyFilter();
+    });
     this.tableContainer = contentEl.createDiv({ cls: "table-container" });
     this.updateNotes();
+    this.boundKeyHandler = (e) => this.handleKeydown(e);
+    contentEl.addEventListener("keydown", this.boundKeyHandler);
+    contentEl.tabIndex = 0;
   }
   /**
    * Update notes when time range changes
@@ -904,10 +1040,54 @@ var PopularNotesModal = class extends import_obsidian.Modal {
     this.notes = all.filter(
       (note) => this.app.vault.getAbstractFileByPath(note.path) !== null
     );
+    this.applyFilter();
+  }
+  /**
+   * Apply text search filter to notes and re-render.
+   */
+  applyFilter() {
+    const q = this.searchQuery.trim();
+    this.filteredNotes = q ? this.notes.filter(
+      (n) => n.name.toLowerCase().includes(q) || n.path.toLowerCase().includes(q)
+    ) : this.notes.slice();
+    this.selectedIndex = 0;
     if (this.tableContainer) {
       this.tableContainer.empty();
       this.renderTable();
     }
+  }
+  /**
+   * Handle keyboard navigation.
+   */
+  handleKeydown(e) {
+    if (this.filteredNotes.length === 0)
+      return;
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      this.selectedIndex = Math.min(this.selectedIndex + 1, this.filteredNotes.length - 1);
+      this.refreshSelection();
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      this.selectedIndex = Math.max(this.selectedIndex - 1, 0);
+      this.refreshSelection();
+    } else if (e.key === "Enter") {
+      const note = this.filteredNotes[this.selectedIndex];
+      if (note) {
+        e.preventDefault();
+        if (this.plugin.openNoteIfExists(note.path)) {
+          this.close();
+        } else {
+          this.updateNotes();
+        }
+      }
+    }
+  }
+  refreshSelection() {
+    var _a;
+    for (let i = 0; i < this.rowEls.length; i++) {
+      this.rowEls[i].toggleClass("rts-row-selected", i === this.selectedIndex);
+    }
+    (_a = this.rowEls[this.selectedIndex]) == null ? void 0 : _a.scrollIntoView({ block: "nearest" });
   }
   /**
    * Render the notes table
@@ -915,8 +1095,10 @@ var PopularNotesModal = class extends import_obsidian.Modal {
   renderTable() {
     if (!this.tableContainer)
       return;
-    if (this.notes.length === 0) {
-      this.tableContainer.createEl("p", { text: "No statistics for this time range.", cls: "no-stats" });
+    this.rowEls = [];
+    if (this.filteredNotes.length === 0) {
+      const msg = this.searchQuery ? "No notes match your search." : "No statistics for this time range.";
+      this.tableContainer.createEl("p", { text: msg, cls: "no-stats" });
       return;
     }
     const table = this.tableContainer.createEl("table", { cls: "popular-table" });
@@ -929,23 +1111,42 @@ var PopularNotesModal = class extends import_obsidian.Modal {
     header.createEl("th", { text: "Last visited" });
     header.createEl("th", { text: "Score" });
     const tbody = table.createEl("tbody");
-    for (let i = 0; i < this.notes.length; i++) {
-      const note = this.notes[i];
+    for (let i = 0; i < this.filteredNotes.length; i++) {
+      const note = this.filteredNotes[i];
       const row = tbody.createEl("tr");
-      if (i === 0)
+      this.rowEls.push(row);
+      if (i === 0 && !this.searchQuery)
         row.addClass("top-note");
+      if (i === this.selectedIndex)
+        row.addClass("rts-row-selected");
+      const originalRank = this.notes.indexOf(note);
+      const rankNum = (originalRank >= 0 ? originalRank : i) + 1;
       const rankCell = row.createEl("td");
       const rankBadge = rankCell.createEl("span", { cls: "modal-rank-badge" });
-      rankBadge.textContent = `#${i + 1}`;
-      if (i < 3)
-        rankBadge.addClass(`rank-${i + 1}`);
+      rankBadge.textContent = `#${rankNum}`;
+      if (rankNum <= 3)
+        rankBadge.addClass(`rank-${rankNum}`);
       const noteCell = row.createEl("td");
-      noteCell.createEl("a", { text: note.name }).addEventListener("click", () => {
+      const link = noteCell.createEl("a", { text: note.name });
+      const open = () => {
         if (this.plugin.openNoteIfExists(note.path)) {
           this.close();
         } else {
           this.updateNotes();
         }
+      };
+      link.addEventListener("click", open);
+      link.addEventListener("dblclick", (e) => {
+        e.preventDefault();
+        open();
+      });
+      row.addEventListener("contextmenu", (e) => {
+        e.preventDefault();
+        this.plugin.showNoteContextMenu(e, note.path, () => this.updateNotes());
+      });
+      row.addEventListener("mouseenter", () => {
+        this.selectedIndex = i;
+        this.refreshSelection();
       });
       row.createEl("td").createEl("span", {
         text: formatReadingTime(note.stats.totalReadingTime),
@@ -964,6 +1165,10 @@ var PopularNotesModal = class extends import_obsidian.Modal {
   }
   onClose() {
     const { contentEl } = this;
+    if (this.boundKeyHandler) {
+      contentEl.removeEventListener("keydown", this.boundKeyHandler);
+      this.boundKeyHandler = null;
+    }
     contentEl.empty();
   }
 };
@@ -1035,6 +1240,13 @@ var ReadingTimeStatSettingTab = class extends import_obsidian.PluginSettingTab {
           this.plugin.getSettings().minSessionTime = num;
           void this.plugin.saveSettings();
         }
+      })
+    );
+    new import_obsidian.Setting(containerEl).setName("Show status bar").setDesc("Display the current session time in the status bar. Click it to open the stats sidebar.").addToggle(
+      (toggle) => toggle.setValue(this.plugin.getSettings().showStatusBar).onChange((value) => {
+        this.plugin.getSettings().showStatusBar = value;
+        void this.plugin.saveSettings();
+        this.plugin.setupStatusBar();
       })
     );
     new import_obsidian.Setting(containerEl).setName("Exclusions").setHeading();

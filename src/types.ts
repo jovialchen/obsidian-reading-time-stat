@@ -76,6 +76,8 @@ export interface ReadingTimeStatSettings {
     excludedFolders: string[];
     /** File name patterns to exclude (supports wildcards, e.g., "todo-*", "*-kanban") */
     excludedPatterns: string[];
+    /** Whether to show a status bar item with the current session time */
+    showStatusBar: boolean;
 }
 
 export const DEFAULT_SETTINGS: ReadingTimeStatSettings = {
@@ -87,6 +89,7 @@ export const DEFAULT_SETTINGS: ReadingTimeStatSettings = {
     popularNotesLimit: 20,
     excludedFolders: [],
     excludedPatterns: [],
+    showStatusBar: true,
 };
 
 export const DEFAULT_STATS_DATA: StatsData = {

@@ -1,6 +1,7 @@
 import {
     App,
     ItemView,
+    Menu,
     Modal,
     Notice,
     Plugin,
@@ -15,6 +16,7 @@ import { DEFAULT_SETTINGS, TIME_RANGE_OPTIONS } from './types';
 import { StatsManager } from './stats';
 import { ReadingTimeTracker } from './tracker';
 import { getPopularNotes, formatReadingTime, formatLastVisited } from './popularity';
+import { shouldExclude } from './exclusions';
 
 const VIEW_TYPE = 'reading-time-stat-view';
 
@@ -25,6 +27,7 @@ export default class ReadingTimeStatPlugin extends Plugin {
     private settings: ReadingTimeStatSettings;
     private statsManager: StatsManager;
     private tracker: ReadingTimeTracker;
+    private statusBarEl: HTMLElement | null = null;
 
     async onload() {
         // Load all plugin data (settings + stats)
@@ -48,6 +51,7 @@ export default class ReadingTimeStatPlugin extends Plugin {
                 if (view) {
                     view.update();
                 }
+                this.updateStatusBar();
             }
         );
 
@@ -92,6 +96,9 @@ export default class ReadingTimeStatPlugin extends Plugin {
 
         // Add settings tab
         this.addSettingTab(new ReadingTimeStatSettingTab(this.app, this));
+
+        // Status bar item (optional)
+        this.setupStatusBar();
 
         // Start tracking
         this.tracker.start();
@@ -261,6 +268,99 @@ export default class ReadingTimeStatPlugin extends Plugin {
     }
 
     /**
+     * Show a context menu for a popular note item.
+     */
+    showNoteContextMenu(event: MouseEvent, path: string, onChange?: () => void): void {
+        const menu = new Menu();
+        const file = this.app.vault.getAbstractFileByPath(path);
+
+        menu.addItem((item) =>
+            item
+                .setTitle('Open')
+                .setIcon('file')
+                .onClick(() => {
+                    this.openNoteIfExists(path);
+                })
+        );
+
+        menu.addItem((item) =>
+            item
+                .setTitle('Open in new tab')
+                .setIcon('lucide-external-link')
+                .onClick(() => {
+                    if (file instanceof TFile) {
+                        void this.app.workspace.getLeaf('tab').openFile(file);
+                    } else {
+                        this.openNoteIfExists(path);
+                    }
+                })
+        );
+
+        menu.addItem((item) =>
+            item
+                .setTitle('Copy path')
+                .setIcon('lucide-copy')
+                .onClick(() => {
+                    void navigator.clipboard.writeText(path);
+                    new Notice('Path copied');
+                })
+        );
+
+        menu.addSeparator();
+
+        menu.addItem((item) =>
+            item
+                .setTitle('Delete stats for this note')
+                .setIcon('lucide-trash-2')
+                .onClick(async () => {
+                    if (this.statsManager.deleteNote(path)) {
+                        await this.saveStats();
+                        this.getView()?.update();
+                        onChange?.();
+                        new Notice('Stats deleted');
+                    }
+                })
+        );
+
+        menu.showAtMouseEvent(event);
+    }
+
+    /**
+     * Create or remove the status bar item based on settings.
+     */
+    setupStatusBar(): void {
+        if (this.settings.showStatusBar) {
+            if (!this.statusBarEl) {
+                this.statusBarEl = this.addStatusBarItem();
+                this.statusBarEl.addClass('reading-time-stat-status');
+                this.statusBarEl.setAttr('aria-label', 'Open reading time stats');
+                this.statusBarEl.addEventListener('click', () => {
+                    void this.activateView();
+                });
+            }
+            this.updateStatusBar();
+        } else if (this.statusBarEl) {
+            this.statusBarEl.remove();
+            this.statusBarEl = null;
+        }
+    }
+
+    /**
+     * Refresh the status bar with the current session time.
+     */
+    updateStatusBar(): void {
+        if (!this.statusBarEl) return;
+        const status = this.tracker.getStatus();
+        if (status.filePath) {
+            this.statusBarEl.setText(`📖 ${formatReadingTime(status.currentSessionTime)}`);
+            this.statusBarEl.style.cursor = 'pointer';
+        } else {
+            this.statusBarEl.setText('📖 —');
+            this.statusBarEl.style.cursor = 'pointer';
+        }
+    }
+
+    /**
      * Get stats manager for view access
      */
     getStatsManager(): StatsManager {
@@ -339,8 +439,24 @@ class ReadingTimeStatView extends ItemView {
         container.empty();
         container.addClass('reading-time-stat-container');
 
-        // Summary section
         const summary = this.plugin.getStatsManager().getSummary();
+
+        // Empty / first-time guidance state
+        if (summary.totalNotes === 0) {
+            const empty = container.createDiv({ cls: 'rts-empty-state' });
+            empty.createEl('div', { text: '📖', cls: 'rts-empty-icon' });
+            empty.createEl('h3', { text: 'No notes tracked yet' });
+            empty.createEl('p', {
+                text: 'Open and read any markdown note to start tracking your reading time. Stats appear here automatically.',
+            });
+            empty.createEl('p', {
+                text: `Sessions count once you read for at least ${this.plugin.getSettings().minSessionTime} seconds.`,
+                cls: 'rts-empty-hint',
+            });
+            return;
+        }
+
+        // Summary section
         const summaryDiv = container.createDiv({ cls: 'stats-summary' });
         summaryDiv.createEl('h3', { text: 'Overview' });
         summaryDiv.createEl('p', {
@@ -410,13 +526,26 @@ class ReadingTimeStatView extends ItemView {
                 const rankBadge = item.createEl('span', { cls: 'rank-badge' });
                 rankBadge.textContent = `#${i + 1}`;
                 if (i === 0) rankBadge.addClass('rank-first');
+                else if (i === 1) rankBadge.addClass('rank-second');
+                else if (i === 2) rankBadge.addClass('rank-third');
 
                 // Note name (clickable)
-                item.createEl('a', {
+                const link = item.createEl('a', {
                     text: note.name,
                     cls: 'note-name',
-                }).addEventListener('click', () => {
+                });
+                link.addEventListener('click', () => {
                     this.plugin.openNoteIfExists(note.path);
+                });
+                // Double-click also opens (consistent with modal)
+                link.addEventListener('dblclick', (e) => {
+                    e.preventDefault();
+                    this.plugin.openNoteIfExists(note.path);
+                });
+                // Context menu (right-click)
+                item.addEventListener('contextmenu', (e) => {
+                    e.preventDefault();
+                    this.plugin.showNoteContextMenu(e, note.path, () => this.update());
                 });
 
                 // Stats row
@@ -486,10 +615,23 @@ class ReadingTimeStatView extends ItemView {
                 });
             }
         } else {
-            trackingDiv.createEl('p', {
-                text: 'No Markdown file active or excluded',
-                cls: 'no-tracking',
-            });
+            // Distinguish between excluded vs no markdown active
+            const activeFile = this.app.workspace.getActiveFile();
+            if (activeFile && activeFile.extension === 'md' && shouldExclude(activeFile.path, this.plugin.getSettings())) {
+                const excluded = trackingDiv.createDiv({ cls: 'no-tracking excluded' });
+                excluded.createEl('span', {
+                    text: 'Excluded',
+                    cls: 'excluded-badge',
+                });
+                excluded.createEl('span', {
+                    text: ' This note matches an exclusion rule.',
+                });
+            } else {
+                trackingDiv.createEl('p', {
+                    text: 'No Markdown file active',
+                    cls: 'no-tracking',
+                });
+            }
         }
     }
 }
@@ -500,10 +642,15 @@ class ReadingTimeStatView extends ItemView {
 class PopularNotesModal extends Modal {
     private plugin: ReadingTimeStatPlugin;
     private notes: PopularNote[];
+    private filteredNotes: PopularNote[] = [];
     private settings: ReadingTimeStatSettings;
     private statsManager: StatsManager;
     private currentTimeRange: TimeRange;
     private tableContainer: HTMLDivElement | null = null;
+    private searchQuery: string = '';
+    private selectedIndex: number = 0;
+    private rowEls: HTMLTableRowElement[] = [];
+    private boundKeyHandler: ((e: KeyboardEvent) => void) | null = null;
 
     constructor(
         app: App,
@@ -548,10 +695,28 @@ class PopularNotesModal extends Modal {
             this.updateNotes();
         });
 
+        // Search input
+        const searchInput = filterDiv.createEl('input', {
+            cls: 'modal-search-input',
+            type: 'search',
+            attr: { placeholder: 'Search notes…' },
+        });
+        searchInput.addEventListener('input', (e) => {
+            this.searchQuery = (e.target as HTMLInputElement).value.toLowerCase();
+            this.applyFilter();
+        });
+
         // Table container for dynamic updates
         this.tableContainer = contentEl.createDiv({ cls: 'table-container' });
+
         // Apply initial filter for non-existent files and render
         this.updateNotes();
+
+        // Keyboard navigation
+        this.boundKeyHandler = (e: KeyboardEvent) => this.handleKeydown(e);
+        contentEl.addEventListener('keydown', this.boundKeyHandler);
+        // Allow the modal to receive focus for keys when no input focused
+        contentEl.tabIndex = 0;
     }
 
     /**
@@ -568,6 +733,20 @@ class PopularNotesModal extends Modal {
         this.notes = all.filter((note) =>
             this.app.vault.getAbstractFileByPath(note.path) !== null
         );
+        this.applyFilter();
+    }
+
+    /**
+     * Apply text search filter to notes and re-render.
+     */
+    private applyFilter(): void {
+        const q = this.searchQuery.trim();
+        this.filteredNotes = q
+            ? this.notes.filter((n) =>
+                n.name.toLowerCase().includes(q) || n.path.toLowerCase().includes(q)
+            )
+            : this.notes.slice();
+        this.selectedIndex = 0;
         if (this.tableContainer) {
             this.tableContainer.empty();
             this.renderTable();
@@ -575,13 +754,51 @@ class PopularNotesModal extends Modal {
     }
 
     /**
+     * Handle keyboard navigation.
+     */
+    private handleKeydown(e: KeyboardEvent): void {
+        if (this.filteredNotes.length === 0) return;
+
+        if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            this.selectedIndex = Math.min(this.selectedIndex + 1, this.filteredNotes.length - 1);
+            this.refreshSelection();
+        } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            this.selectedIndex = Math.max(this.selectedIndex - 1, 0);
+            this.refreshSelection();
+        } else if (e.key === 'Enter') {
+            const note = this.filteredNotes[this.selectedIndex];
+            if (note) {
+                e.preventDefault();
+                if (this.plugin.openNoteIfExists(note.path)) {
+                    this.close();
+                } else {
+                    this.updateNotes();
+                }
+            }
+        }
+    }
+
+    private refreshSelection(): void {
+        for (let i = 0; i < this.rowEls.length; i++) {
+            this.rowEls[i].toggleClass('rts-row-selected', i === this.selectedIndex);
+        }
+        this.rowEls[this.selectedIndex]?.scrollIntoView({ block: 'nearest' });
+    }
+
+    /**
      * Render the notes table
      */
     private renderTable(): void {
         if (!this.tableContainer) return;
+        this.rowEls = [];
 
-        if (this.notes.length === 0) {
-            this.tableContainer.createEl('p', { text: 'No statistics for this time range.', cls: 'no-stats' });
+        if (this.filteredNotes.length === 0) {
+            const msg = this.searchQuery
+                ? 'No notes match your search.'
+                : 'No statistics for this time range.';
+            this.tableContainer.createEl('p', { text: msg, cls: 'no-stats' });
             return;
         }
 
@@ -597,26 +814,47 @@ class PopularNotesModal extends Modal {
 
         const tbody = table.createEl('tbody');
 
-        for (let i = 0; i < this.notes.length; i++) {
-            const note = this.notes[i];
+        for (let i = 0; i < this.filteredNotes.length; i++) {
+            const note = this.filteredNotes[i];
             const row = tbody.createEl('tr');
-            if (i === 0) row.addClass('top-note');
+            this.rowEls.push(row);
+            if (i === 0 && !this.searchQuery) row.addClass('top-note');
+            if (i === this.selectedIndex) row.addClass('rts-row-selected');
 
-            // Rank cell with badge
+            // Rank cell with badge — use original rank from full list
+            const originalRank = this.notes.indexOf(note);
+            const rankNum = (originalRank >= 0 ? originalRank : i) + 1;
             const rankCell = row.createEl('td');
             const rankBadge = rankCell.createEl('span', { cls: 'modal-rank-badge' });
-            rankBadge.textContent = `#${i + 1}`;
-            if (i < 3) rankBadge.addClass(`rank-${i + 1}`);
+            rankBadge.textContent = `#${rankNum}`;
+            if (rankNum <= 3) rankBadge.addClass(`rank-${rankNum}`);
 
             // Note name
             const noteCell = row.createEl('td');
-            noteCell.createEl('a', { text: note.name }).addEventListener('click', () => {
+            const link = noteCell.createEl('a', { text: note.name });
+            const open = () => {
                 if (this.plugin.openNoteIfExists(note.path)) {
                     this.close();
                 } else {
-                    // File missing — refresh list to remove it
                     this.updateNotes();
                 }
+            };
+            link.addEventListener('click', open);
+            link.addEventListener('dblclick', (e) => {
+                e.preventDefault();
+                open();
+            });
+
+            // Right-click context menu on the row
+            row.addEventListener('contextmenu', (e) => {
+                e.preventDefault();
+                this.plugin.showNoteContextMenu(e, note.path, () => this.updateNotes());
+            });
+
+            // Track hover to update selection for keyboard
+            row.addEventListener('mouseenter', () => {
+                this.selectedIndex = i;
+                this.refreshSelection();
             });
 
             // Stats
@@ -638,6 +876,10 @@ class PopularNotesModal extends Modal {
 
     onClose(): void {
         const { contentEl } = this;
+        if (this.boundKeyHandler) {
+            contentEl.removeEventListener('keydown', this.boundKeyHandler);
+            this.boundKeyHandler = null;
+        }
         contentEl.empty();
     }
 }
@@ -770,6 +1012,19 @@ class ReadingTimeStatSettingTab extends PluginSettingTab {
                             this.plugin.getSettings().minSessionTime = num;
                             void this.plugin.saveSettings();
                         }
+                    })
+            );
+
+        new Setting(containerEl)
+            .setName('Show status bar')
+            .setDesc('Display the current session time in the status bar. Click it to open the stats sidebar.')
+            .addToggle((toggle) =>
+                toggle
+                    .setValue(this.plugin.getSettings().showStatusBar)
+                    .onChange((value) => {
+                        this.plugin.getSettings().showStatusBar = value;
+                        void this.plugin.saveSettings();
+                        this.plugin.setupStatusBar();
                     })
             );
 

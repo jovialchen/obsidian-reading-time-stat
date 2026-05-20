@@ -1,5 +1,28 @@
 /* Reading Time Statistics Plugin - Modern Design */
 
+/*
+ * Theme-overridable variables.
+ * Themes & users can override these in their CSS snippets, e.g.:
+ *   :root {
+ *       --rts-rank-gold-1: #ffd700;
+ *       --rts-rank-gold-2: #ffaa00;
+ *   }
+ * Defaults pick subtle colors derived from the active theme.
+ */
+:root {
+    --rts-rank-gold-1: #f1c40f;
+    --rts-rank-gold-2: #f39c12;
+    --rts-rank-silver-1: #bdc3c7;
+    --rts-rank-silver-2: #95a5a6;
+    --rts-rank-bronze-1: #d35400;
+    --rts-rank-bronze-2: #e67e22;
+    --rts-rank-text: #fff;
+    --rts-top-row-tint: rgba(241, 196, 15, 0.08);
+    --rts-top-row-tint-hover: rgba(241, 196, 15, 0.12);
+    --rts-first-item-tint: rgba(46, 204, 113, 0.08);
+    --rts-first-item-tint-hover: rgba(46, 204, 113, 0.12);
+}
+
 /* ===== Main Container ===== */
 .reading-time-stat-container {
     display: flex;
@@ -152,11 +175,11 @@
 }
 
 .popular-item:first-child {
-    background: linear-gradient(90deg, rgba(46, 204, 113, 0.08) 0%, transparent 100%);
+    background: linear-gradient(90deg, var(--rts-first-item-tint) 0%, transparent 100%);
 }
 
 .popular-item:first-child:hover {
-    background: linear-gradient(90deg, rgba(46, 204, 113, 0.12) 0%, var(--background-primary-alt) 100%);
+    background: linear-gradient(90deg, var(--rts-first-item-tint-hover) 0%, var(--background-primary-alt) 100%);
 }
 
 /* Rank Badge */
@@ -176,8 +199,18 @@
 }
 
 .rank-badge.rank-first {
-    background: linear-gradient(135deg, #f1c40f 0%, #f39c12 100%);
-    color: #fff;
+    background: linear-gradient(135deg, var(--rts-rank-gold-1) 0%, var(--rts-rank-gold-2) 100%);
+    color: var(--rts-rank-text);
+}
+
+.rank-badge.rank-second {
+    background: linear-gradient(135deg, var(--rts-rank-silver-1) 0%, var(--rts-rank-silver-2) 100%);
+    color: var(--rts-rank-text);
+}
+
+.rank-badge.rank-third {
+    background: linear-gradient(135deg, var(--rts-rank-bronze-1) 0%, var(--rts-rank-bronze-2) 100%);
+    color: var(--rts-rank-text);
 }
 
 .note-name {
@@ -425,11 +458,11 @@
 }
 
 .popular-table tbody tr.top-note {
-    background: linear-gradient(90deg, rgba(241, 196, 15, 0.08) 0%, transparent 100%);
+    background: linear-gradient(90deg, var(--rts-top-row-tint) 0%, transparent 100%);
 }
 
 .popular-table tbody tr.top-note:hover {
-    background: linear-gradient(90deg, rgba(241, 196, 15, 0.12) 0%, var(--background-primary-alt) 100%);
+    background: linear-gradient(90deg, var(--rts-top-row-tint-hover) 0%, var(--background-primary-alt) 100%);
 }
 
 /* Modal Rank Badge */
@@ -448,18 +481,18 @@
 }
 
 .modal-rank-badge.rank-1 {
-    background: linear-gradient(135deg, #f1c40f 0%, #f39c12 100%);
-    color: #fff;
+    background: linear-gradient(135deg, var(--rts-rank-gold-1) 0%, var(--rts-rank-gold-2) 100%);
+    color: var(--rts-rank-text);
 }
 
 .modal-rank-badge.rank-2 {
-    background: linear-gradient(135deg, #bdc3c7 0%, #95a5a6 100%);
-    color: #fff;
+    background: linear-gradient(135deg, var(--rts-rank-silver-1) 0%, var(--rts-rank-silver-2) 100%);
+    color: var(--rts-rank-text);
 }
 
 .modal-rank-badge.rank-3 {
-    background: linear-gradient(135deg, #d35400 0%, #e67e22 100%);
-    color: #fff;
+    background: linear-gradient(135deg, var(--rts-rank-bronze-1) 0%, var(--rts-rank-bronze-2) 100%);
+    color: var(--rts-rank-text);
 }
 
 .popular-table td {
@@ -563,4 +596,110 @@
     .popular-table td {
         padding: 8px 10px;
     }
+}
+
+/* ===== Empty State ===== */
+.rts-empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 32px 16px;
+    gap: 10px;
+    color: var(--text-muted);
+    background: var(--background-secondary);
+    border: 1px dashed var(--background-modifier-border);
+    border-radius: 8px;
+    margin-top: 16px;
+}
+
+.rts-empty-icon {
+    font-size: 2.4em;
+    line-height: 1;
+}
+
+.rts-empty-state h3 {
+    margin: 0;
+    font-size: 1em;
+    color: var(--text-normal);
+}
+
+.rts-empty-state p {
+    margin: 0;
+    font-size: 0.85em;
+    line-height: 1.4;
+    max-width: 320px;
+}
+
+.rts-empty-hint {
+    color: var(--text-faint);
+    font-size: 0.8em;
+}
+
+/* ===== Excluded Badge ===== */
+.no-tracking.excluded {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px;
+    color: var(--text-muted);
+    text-align: left;
+    padding: 8px 10px;
+    background: var(--background-primary-alt);
+    border-radius: 4px;
+    font-size: 0.85em;
+}
+
+.excluded-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 10px;
+    background: var(--background-modifier-border);
+    color: var(--text-muted);
+    font-size: 0.75em;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+}
+
+/* ===== Modal Search Input ===== */
+.modal-search-input {
+    flex: 1;
+    min-width: 0;
+    padding: 4px 8px;
+    border-radius: 4px;
+    border: 1px solid var(--background-modifier-border);
+    background: var(--background-primary);
+    color: var(--text-normal);
+    font-size: 0.85em;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.modal-search-input:focus {
+    outline: none;
+    border-color: var(--interactive-accent);
+    box-shadow: 0 0 0 2px var(--interactive-accent-hover);
+}
+
+/* ===== Modal Row Keyboard Selection ===== */
+.popular-table tbody tr.rts-row-selected,
+.popular-table tbody tr.rts-row-selected:hover {
+    background: var(--background-modifier-hover);
+    outline: 2px solid var(--interactive-accent);
+    outline-offset: -2px;
+}
+
+/* ===== Status Bar Item ===== */
+.status-bar-item.reading-time-stat-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: color 0.15s ease;
+}
+
+.status-bar-item.reading-time-stat-status:hover {
+    color: var(--text-accent);
 }
